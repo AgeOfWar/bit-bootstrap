@@ -25,7 +25,7 @@ public class Lexer implements TokenStream {
             case '=' -> peek[1] == '=' ? nextEqual() : nextAssign();
             case ',' -> nextComma();
             case ':' -> nextColon();
-            case '/' -> nextSlash();
+            case '/' -> peek[1] == '/' ? nextComment() : nextSlash();
             case '*' -> nextAsterisk();
             case '&' -> nextAmpersand();
             case '|' -> nextPipe();
@@ -63,6 +63,22 @@ public class Lexer implements TokenStream {
                 }
             }
         };
+    }
+
+    public Token nextComment() {
+        expect('/');
+        expect('/');
+        int code;
+        while ((code = reader.peek()) != '\n' && code != '\r' && code != -1) {
+            reader.next();
+        }
+
+        reader.next();
+        if (code == '\r' && reader.peek() == '\n') {
+            reader.next();
+        }
+
+        return nextToken();
     }
 
     public Token.Identifier nextIdentifier() {
