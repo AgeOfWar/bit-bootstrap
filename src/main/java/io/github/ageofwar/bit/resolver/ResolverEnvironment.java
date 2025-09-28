@@ -15,6 +15,7 @@ import static io.github.ageofwar.bit.types.Types.none;
 import static io.github.ageofwar.bit.types.Types.string;
 
 public class ResolverEnvironment {
+    private final ResolverEnvironment parent;
     private final ScopedTable<VariableType> valueTypes;
     private final ScopedTable<ValueType> types;
     private final ScopedTable<ValueTypeFunction> functionTypes;
@@ -37,6 +38,7 @@ public class ResolverEnvironment {
     }
 
     public ResolverEnvironment(ResolverEnvironment parent) {
+        this.parent = parent;
         this.valueTypes = new ScopedTable<>(parent != null ? parent.valueTypes : null);
         this.types = new ScopedTable<>(parent != null ? parent.types : null);
         this.functionTypes = new ScopedTable<>(parent != null ? parent.functionTypes : null);
@@ -50,10 +52,24 @@ public class ResolverEnvironment {
         return variablesCount;
     }
 
+    private void incrementVariablesCount() {
+        if (parent != null) {
+            parent.incrementVariablesCount();
+        }
+        variablesCount++;
+    }
+
+    private void incrementOtherCount() {
+        if (parent != null) {
+            parent.incrementOtherCount();
+        }
+        otherCount++;
+    }
+
     public ResolvedBit.Symbol declareVariableType(String name, Type type) {
         var symbol = new ResolvedBit.Symbol(name, variablesCount);
         valueTypes.declare(name, new VariableType(symbol, type, true));
-        variablesCount++;
+        incrementVariablesCount();
         return symbol;
     }
 
@@ -71,7 +87,7 @@ public class ResolverEnvironment {
     public ResolvedBit.Symbol declareValueType(String name, Type type) {
         var symbol = new ResolvedBit.Symbol(name, variablesCount);
         valueTypes.declare(name, new VariableType(symbol, type, false));
-        variablesCount++;
+        incrementVariablesCount();
         return symbol;
     }
 
@@ -86,7 +102,7 @@ public class ResolverEnvironment {
     public ResolvedBit.Symbol declareType(String name, Type type) {
         var symbol = declareValueType(name, type);
         types.declare(name, new ValueType(symbol, type));
-        otherCount++;
+        incrementOtherCount();
         return symbol;
     }
 
@@ -101,7 +117,7 @@ public class ResolverEnvironment {
     public ResolvedBit.Symbol declareFunctionType(String name, TypeFunction type) {
         var value = new ResolvedBit.Symbol(name, otherCount);
         functionTypes.declare(name, new ValueTypeFunction(value, type));
-        otherCount++;
+        incrementOtherCount();
         return value;
     }
 
@@ -116,7 +132,7 @@ public class ResolverEnvironment {
     public ResolvedBit.Symbol declareConstructor(String name, Type type) {
         var symbol = new ResolvedBit.Symbol(name, variablesCount);
         constructors.declare(name, new ValueType(symbol, type));
-        variablesCount++;
+        incrementVariablesCount();
         return symbol;
     }
 
@@ -132,7 +148,7 @@ public class ResolverEnvironment {
         var symbol = new ResolvedBit.Symbol(name, variablesCount);
         var candidates = extensionTypes.getSymbols().computeIfAbsent(name, k -> new ArrayList<>());
         candidates.add(new ExtensionType(symbol, receiverType, type));
-        variablesCount++;
+        incrementVariablesCount();
         return symbol;
     }
 

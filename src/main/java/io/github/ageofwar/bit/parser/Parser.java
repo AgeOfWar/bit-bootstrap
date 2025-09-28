@@ -280,7 +280,8 @@ public class Parser {
                 continue;
             }
             if (matches(tokens, Token.LeftParenthesis.class)) {
-                return nextCall(lhs);
+                lhs = nextCall(lhs);
+                continue;
             }
             tokens.next();
             var rhs = nextExpression(nextMinPrecedence);

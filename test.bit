@@ -1,0 +1,16 @@
+class Thing(private s: String) {
+    fun wow(): String {
+        this.s
+    }
+}
+
+implement String {
+    fun hello() {
+        print(this)
+    }
+}
+
+fun main() {
+    test = new Thing("Hello World!")
+    test.wow().hello()
+}
