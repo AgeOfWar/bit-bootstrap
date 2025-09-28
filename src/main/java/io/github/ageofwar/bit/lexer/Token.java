@@ -50,7 +50,7 @@ public sealed interface Token {
             PRIVATE("private"),
             VAR("var"),
             SET("set"),
-            IMPLEMENT("implement");
+            IMPLEMENT("impl");
 
             private static final Map<String, Type> byName = new HashMap<>();
             static {

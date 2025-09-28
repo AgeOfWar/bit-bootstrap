@@ -15,7 +15,7 @@ public class Main {
             var parser = new Parser(reader);
             var program = parser.nextProgram();
             var printer = new Printer();
-            System.out.println(printer.print(program));
+            // System.out.println(printer.print(program));
             var resolver = new Resolver();
             var resolvedProgram = resolver.resolve(program);
             var interpreter = new Interpreter();

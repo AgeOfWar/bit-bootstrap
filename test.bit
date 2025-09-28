@@ -4,7 +4,7 @@ class Thing(private s: String) {
     }
 }
 
-implement String {
+impl String {
     fun hello() {
         print(this)
     }
