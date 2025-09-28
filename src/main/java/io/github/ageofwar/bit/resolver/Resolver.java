@@ -99,12 +99,13 @@ public class Resolver {
         var constructor = new ResolvedBit.Declaration.Class.Constructor(constructorParameters);
 
         var bodyEnvironment = new ResolverEnvironment(membersEnvironment);
+        var methodEnvironment = new ResolverEnvironment(environment); // methods can't access constructor parameters
         var resolvedMembers = new ArrayList<ResolvedBit.Declaration.Class.Member>();
         var thisType = new HashMap<String, Type>();
         var publicType = new HashMap<String, Type>();
-        var thisSymbol = bodyEnvironment.declareValueType("this", struct(thisType));
+        var thisSymbol = methodEnvironment.declareValueType("this", struct(thisType));
         for (var member : classDeclaration.members()) {
-            var resolvedDeclaration = resolve(member.declaration(), bodyEnvironment);
+            var resolvedDeclaration = resolve(member.declaration(), member.declaration() instanceof Bit.Declaration.Function ? methodEnvironment : bodyEnvironment);
             var visibility = member.visibility() == Bit.Declaration.Class.Member.Visibility.PUBLIC ? ResolvedBit.Declaration.Class.Member.Visibility.PUBLIC : ResolvedBit.Declaration.Class.Member.Visibility.PRIVATE;
             resolvedMembers.add(new ResolvedBit.Declaration.Class.Member(resolvedDeclaration, visibility));
             if (resolvedDeclaration instanceof ResolvedBit.Declaration.Class || resolvedDeclaration instanceof ResolvedBit.Declaration.Type) {
