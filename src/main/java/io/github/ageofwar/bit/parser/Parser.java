@@ -72,11 +72,11 @@ public class Parser {
                         case VAR -> statements.add(nextVariableDeclaration());
                         case SET -> statements.add(nextVariableAssignment());
                         case IMPLEMENT -> statements.add(nextImplementation());
-                        default -> throw new ParserException("Expected declaration");
+                        default -> throw error("Expected declaration");
                     }
                 }
                 case Token.Identifier identifier -> statements.add(nextValueDeclaration());
-                default -> throw new ParserException("Expected declaration");
+                default -> throw error("Expected declaration");
             }
             skipNewLines();
         }
@@ -211,9 +211,9 @@ public class Parser {
                     case Token.Keyword(var type) -> switch (type) {
                         case PRIVATE -> Bit.Declaration.Class.Member.Visibility.PRIVATE;
                         case PUBLIC -> Bit.Declaration.Class.Member.Visibility.PUBLIC;
-                        default -> throw new ParserException("Expected visibility modifier, but got: " + tokens.peek());
+                        default -> throw error("Expected visibility modifier, but got: " + tokens.peek());
                     };
-                    default -> throw new ParserException("Expected visibility modifier or identifier, but got: " + tokens.peek());
+                    default -> throw error("Expected visibility modifier or identifier, but got: " + tokens.peek());
                 };
                 tokens.next();
             }
@@ -244,16 +244,16 @@ public class Parser {
                 visibility = Bit.Declaration.Class.Member.Visibility.PRIVATE;
                 tokens.next();
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw new ParserException("Cannot use assignment in class initialization");
+                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             } else if (matches(tokens, Token.Keyword.Type.PUBLIC)) {
                 tokens.next();
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw new ParserException("Cannot use assignment in class initialization");
+                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             } else {
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw new ParserException("Cannot use assignment in class initialization");
+                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 if (declaration instanceof Bit.Declaration.Value) visibility = Bit.Declaration.Class.Member.Visibility.PRIVATE;
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             }
@@ -309,9 +309,9 @@ public class Parser {
                     case Token.Keyword(var type) -> switch (type) {
                         case AS -> new Bit.Expression.As(lhs, rhs);
                         case IS -> new Bit.Expression.Is(lhs, rhs);
-                        default -> throw new ParserException("Unexpected keyword: " + type);
+                        default -> throw error("Unexpected keyword: " + type);
                     };
-                    default -> throw new ParserException("Expected 'as' or 'is' after operator: " + operator);
+                    default -> throw error("Expected 'as' or 'is' after operator: " + operator);
                 };
                 continue;
             }
@@ -335,16 +335,16 @@ public class Parser {
                 case Token.Keyword(var type) -> switch (type) {
                     case AND -> new Bit.Expression.And(lhs, rhs);
                     case OR -> new Bit.Expression.Or(lhs, rhs);
-                    default -> throw new ParserException("Unexpected keyword: " + type);
+                    default -> throw error("Unexpected keyword: " + type);
                 };
                 case Token.Dot token -> {
                     if (!(rhs instanceof Bit.Expression.Identifier)) {
-                        throw new ParserException("Expected identifier after dot, but got: " + rhs);
+                        throw error("Expected identifier after dot, but got: " + rhs);
                     }
                     var field = ((Bit.Expression.Identifier) rhs).name();
                     yield new Bit.Expression.Access(lhs, field);
                 }
-                default -> throw new ParserException("Unexpected operator: " + operator);
+                default -> throw error("Unexpected operator: " + operator);
             };
         }
     }
@@ -356,7 +356,7 @@ public class Parser {
                 case NOT -> new Bit.Expression.Not(nextExpression(precedence(peek[0])));
                 case IF -> nextIfExpression();
                 case NEW -> nextInstantiation();
-                default -> throw new ParserException("Unexpected keyword: " + type);
+                default -> throw error("Unexpected keyword: " + type);
             };
             case Token.Identifier token -> nextIdentifier();
             case Token.NumberLiteral token -> nextNumber();
@@ -365,7 +365,7 @@ public class Parser {
             case Token.LeftParenthesis token -> peek[1] instanceof Token.RightParenthesis || peek[2] instanceof Token.Colon ? nextFunction() : nextGroupExpression();
             case Token.LeftBracket token ->  nextStruct();
             case Token.LeftBrace token -> nextBlock();
-            default -> throw new ParserException("Expected expression, but got: " + tokens.peek());
+            default -> throw error("Expected expression, but got: " + tokens.peek());
         };
     }
 
@@ -428,7 +428,7 @@ public class Parser {
 
     private Bit nextDeclarationOrExpression() {
         var tokens = this.tokens.peek(2);
-        if (tokens[0] instanceof Token.Keyword) {
+        if (tokens[0] instanceof Token.Keyword(var type) && type != Token.Keyword.Type.IF && type != Token.Keyword.Type.NEW) {
             return nextDeclaration();
         }
         return tokens[1] instanceof Token.Assign || tokens[1] instanceof Token.Colon ? nextValueDeclaration() : nextExpression();
@@ -443,10 +443,10 @@ public class Parser {
                 case VAR -> nextVariableDeclaration();
                 case SET -> nextVariableAssignment();
                 case IMPLEMENT -> nextImplementation();
-                default -> throw new ParserException("Expected declaration");
+                default -> throw error("Expected declaration");
             };
             case Token.Identifier identifier -> nextValueDeclaration();
-            default -> throw new ParserException("Expected declaration");
+            default -> throw error("Expected declaration");
         };
     }
 
@@ -492,5 +492,9 @@ public class Parser {
 
     private void skipNewLines() {
         while (tokens.peek() instanceof Token.NewLine) tokens.next();
+    }
+    
+    private ParserException error(String message) {
+        return new ParserException(message + " at token: " + tokens.peek());
     }
 }

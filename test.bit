@@ -1,5 +1,6 @@
-from types import *
-
 fun main() {
-    print(x)
+    x: Integer = 10
+    if (x == 10) {
+        print(x)
+    }
 }
