@@ -1,25 +1,69 @@
 package io.github.ageofwar.bit.resolver;
 
+import io.github.ageofwar.bit.lexer.Lexer;
+import io.github.ageofwar.bit.packages.PackageResolver;
 import io.github.ageofwar.bit.parser.Bit;
+import io.github.ageofwar.bit.parser.Parser;
 import io.github.ageofwar.bit.types.Type;
 import io.github.ageofwar.bit.types.TypeFunction;
 import io.github.ageofwar.bit.types.Types;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static io.github.ageofwar.bit.types.Types.*;
 
 public class Resolver {
+    private final PackageResolver packageResolver;
+
+    public Resolver(PackageResolver packageResolver) {
+        this.packageResolver = packageResolver;
+    }
+
     public ResolvedBit.Program resolve(Bit.Program program) {
         var environment = ResolverEnvironment.init();
-        var declarations = program.declarations().stream()
-                .map(declaration -> resolve(declaration, environment))
-                .toList();
-        return new ResolvedBit.Program(declarations, environment);
+        return resolve(program, environment, new Bit.Program.Import.IdentifierSelector.All(), new HashMap<>());
     }
+
+    private ResolvedBit.Program resolve(Bit.Program program, ResolverEnvironment environment, Bit.Program.Import.IdentifierSelector publicDeclarations, Map<String, ResolvedBit.Program> alreadyImported) {
+        var declarations = new ArrayList<ResolvedBit.Declaration>();
+
+        var mergedEnvironment = new ResolverEnvironment(environment);
+        for (var importDecl : program.imports()) {
+            var key = String.join(".", importDecl.path());
+            var resolvedProgram = alreadyImported.get(key);
+            if (!alreadyImported.containsKey(key)) {
+                alreadyImported.put(key, null); // mark as in-progress to detect cyclic imports
+                var importedProgram = packageResolver.resolvePackage(importDecl.path());
+                var lexer = new Lexer(importedProgram);
+                var parser = new Parser(lexer);
+                var importedBitProgram = parser.nextProgram();
+                var importEnv = new ResolverEnvironment(environment);
+                resolvedProgram = resolve(importedBitProgram, importEnv, importDecl.identifiers(), alreadyImported);
+                alreadyImported.put(key, resolvedProgram);
+            } else if (resolvedProgram == null) {
+                throw new ResolverException("Cyclic import detected for package: " + key);
+            }
+
+            declarations.addAll(resolvedProgram.declarations());
+            mergedEnvironment = resolvedProgram.environment().cloneWithParent(mergedEnvironment);
+        }
+
+        var publicEnvironment = new ResolverEnvironment(mergedEnvironment);
+
+        for (var declaration : program.declarations()) {
+            var resolved = resolve(
+                    declaration,
+                    publicDeclarations.isIdentifier(declaration.name())
+                            ? publicEnvironment
+                            : mergedEnvironment
+            );
+            declarations.add(resolved);
+        }
+
+        return new ResolvedBit.Program(declarations, publicEnvironment, environment.variables());
+    }
+
 
     private ResolvedBit.Declaration resolve(Bit.Declaration declaration, ResolverEnvironment environment) {
         return switch (declaration) {

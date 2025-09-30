@@ -2,6 +2,7 @@ package io.github.ageofwar.bit.print;
 
 import io.github.ageofwar.bit.parser.Bit;
 
+import java.util.List;
 import java.util.Objects;
 
 public class Printer {
@@ -16,6 +17,13 @@ public class Printer {
 
     private String printProgram(Bit.Program program) {
         var sb = new StringBuilder();
+        for (Bit.Program.Import importStmt : program.imports()) {
+            var identifiers = importStmt.identifiers() instanceof Bit.Program.Import.IdentifierSelector.All ? List.of("*") : ((Bit.Program.Import.IdentifierSelector.Only) importStmt.identifiers()).identifiers();
+            sb.append("from ").append(String.join(".", importStmt.path())).append(" import").append(String.join(", ", identifiers)).append("\n");
+        }
+        if (!program.imports().isEmpty()) {
+            sb.append("\n");
+        }
         for (Bit.Declaration declaration : program.declarations()) {
             sb.append(printDeclaration(declaration)).append("\n");
         }

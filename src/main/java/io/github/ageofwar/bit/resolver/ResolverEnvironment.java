@@ -15,12 +15,12 @@ import static io.github.ageofwar.bit.types.Types.none;
 import static io.github.ageofwar.bit.types.Types.string;
 
 public class ResolverEnvironment {
-    private final ResolverEnvironment parent;
-    private final ScopedTable<VariableType> valueTypes;
-    private final ScopedTable<ValueType> types;
-    private final ScopedTable<ValueTypeFunction> functionTypes;
-    private final ScopedTable<ValueType> constructors;
-    private final ScopedTable<List<ExtensionType>> extensionTypes;
+    private ResolverEnvironment parent;
+    private ScopedTable<VariableType> valueTypes;
+    private ScopedTable<ValueType> types;
+    private ScopedTable<ValueTypeFunction> functionTypes;
+    private ScopedTable<ValueType> constructors;
+    private ScopedTable<List<ExtensionType>> extensionTypes;
 
     int variablesCount;
     int otherCount;
@@ -162,16 +162,29 @@ public class ResolverEnvironment {
         valueTypes.declare(oldSymbol.name(), new VariableType(existingType.symbol, newType, false));
     }
 
+    public ResolverEnvironment cloneWithParent(ResolverEnvironment environment) {
+        var env = new ResolverEnvironment(environment);
+        env.valueTypes = valueTypes;
+        env.types = types;
+        env.functionTypes = functionTypes;
+        env.constructors = constructors;
+        env.extensionTypes = extensionTypes;
+        env.variablesCount = variablesCount;
+        env.otherCount = otherCount;
+        return env;
+    }
+
     public record ValueTypeFunction(ResolvedBit.Symbol symbol, TypeFunction type) {
-    }
 
+    }
     public record ValueType(ResolvedBit.Symbol symbol, Type type) {
-    }
 
+    }
     public record VariableType(ResolvedBit.Symbol symbol, Type type, boolean variable) {
-    }
 
+    }
     public record ExtensionType(ResolvedBit.Symbol symbol, Type receiverType, Type type) {
+
     }
 
     @Override

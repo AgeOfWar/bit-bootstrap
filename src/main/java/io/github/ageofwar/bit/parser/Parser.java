@@ -55,6 +55,11 @@ public class Parser {
 
     public Bit.Program nextProgram() {
         skipNewLines();
+        var imports = new ArrayList<Bit.Program.Import>();
+        while (matches(tokens, Token.Keyword.Type.FROM)) {
+            imports.add(nextImport());
+            skipNewLines();
+        }
         var statements = new ArrayList<Bit.Declaration>();
         var peek = tokens.peek();
         while ((peek = tokens.peek()) != null) {
@@ -75,7 +80,38 @@ public class Parser {
             }
             skipNewLines();
         }
-        return new Bit.Program(statements);
+        return new Bit.Program(imports, statements);
+    }
+
+    private Bit.Program.Import nextImport() {
+        expect(tokens, Token.Keyword.Type.FROM);
+        var path = new ArrayList<String>();
+        while (true) {
+            var identifier = expect(tokens, Token.Identifier.class);
+            path.add(identifier.name());
+            if (matches(tokens, Token.Dot.class)) {
+                tokens.next();
+            } else {
+                break;
+            }
+        }
+        expect(tokens, Token.Keyword.Type.IMPORT);
+        if (matches(tokens, Token.Asterisk.class)) {
+            tokens.next();
+            return new Bit.Program.Import(path.toArray(new String[0]), new Bit.Program.Import.IdentifierSelector.All());
+        }
+        var identifiers = new ArrayList<String>();
+        while (true) {
+            var identifier = expect(tokens, Token.Identifier.class);
+            identifiers.add(identifier.name());
+            if (matches(tokens, Token.Comma.class)) {
+                tokens.next();
+                skipNewLines();
+            } else {
+                break;
+            }
+        }
+        return new Bit.Program.Import(path.toArray(new String[0]), new Bit.Program.Import.IdentifierSelector.Only(identifiers));
     }
 
     private Bit.Expression.Identifier nextIdentifier() {

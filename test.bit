@@ -1,16 +1,5 @@
-class Thing(private s: String) {
-    fun wow(): String {
-        this.s
-    }
-}
-
-impl String {
-    fun hello() {
-        print(this)
-    }
-}
+from types import *
 
 fun main() {
-    test = new Thing("Hello World!")
-    test.wow().hello()
+    print(x)
 }

@@ -4,7 +4,26 @@ import java.util.List;
 import java.util.Map;
 
 public sealed interface Bit {
-    record Program(List<Declaration> declarations) implements Bit {}
+    record Program(List<Import> imports, List<Declaration> declarations) implements Bit {
+        public record Import(String[] path, IdentifierSelector identifiers) {
+            public sealed interface IdentifierSelector {
+                boolean isIdentifier(String identifier);
+
+                record All() implements IdentifierSelector {
+                    @Override
+                    public boolean isIdentifier(String identifier) {
+                        return true;
+                    }
+                }
+                record Only(List<String> identifiers) implements IdentifierSelector {
+                    @Override
+                    public boolean isIdentifier(String identifier) {
+                        return identifiers.contains(identifier);
+                    }
+                }
+            }
+        }
+    }
 
     sealed interface Declaration extends Bit {
         String name();

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 public class ScopedTable<T> {
-    private final ScopedTable<T> parent;
+    private ScopedTable<T> parent;
     private final Map<String, T> symbols;
 
     public ScopedTable(ScopedTable<T> parent) {
@@ -44,6 +44,18 @@ public class ScopedTable<T> {
             results.addAll(parent.resolveAll(name));
         }
         return results;
+    }
+
+    public void skipParent() {
+        if (parent == null) {
+            throw new IllegalStateException("No parent to skip");
+        }
+
+        this.parent = parent.parent;
+    }
+
+    public void setParent(ScopedTable<T> parent) {
+        this.parent = parent;
     }
 
     public Map<String, T> getSymbols() {

@@ -1,8 +1,10 @@
 package io.github.ageofwar.bit.interpreter;
 
+import io.github.ageofwar.bit.packages.PackageResolver;
 import io.github.ageofwar.bit.resolver.ResolvedBit;
 import io.github.ageofwar.bit.types.Type;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,14 +15,22 @@ import java.util.stream.Collectors;
 import static io.github.ageofwar.bit.types.Types.*;
 
 public class Interpreter {
+    private final PackageResolver packageResolver;
+
+    public Interpreter(PackageResolver packageResolver) {
+        this.packageResolver = packageResolver;
+    }
+
     @SuppressWarnings("unchecked")
     public void interpret(ResolvedBit.Program program, String mainFunctionName) {
-        var environment = Environment.init(program.environment().variables());
+        var environment = Environment.init(program.variables());
+        interpret(program, environment);
+
         ResolvedBit.Symbol mainSymbol = null;
         for (var declaration : program.declarations()) {
-            interpret(declaration, environment);
             if (declaration.name().name().equals(mainFunctionName)) {
                 mainSymbol = declaration.name();
+                break;
             }
         }
         if (mainSymbol == null) {
@@ -28,6 +38,12 @@ public class Interpreter {
         }
         var main = (Function<List<Object>, Object>) environment.get(mainSymbol);
         main.apply(List.of());
+    }
+
+    public void interpret(ResolvedBit.Program program, Environment environment) {
+        for (var declaration : program.declarations()) {
+            interpret(declaration, environment);
+        }
     }
 
     private void interpret(ResolvedBit.Declaration declaration, Environment environment) {

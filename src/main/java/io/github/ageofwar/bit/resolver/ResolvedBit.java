@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public sealed interface ResolvedBit {
-    record Program(List<ResolvedBit.Declaration> declarations, ResolverEnvironment environment) implements ResolvedBit {}
+    record Program(List<ResolvedBit.Declaration> declarations, ResolverEnvironment environment, int variables) implements ResolvedBit {}
 
     sealed interface Declaration extends ResolvedBit {
         Symbol name();

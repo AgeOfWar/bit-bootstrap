@@ -1,22 +1,11 @@
-type Boolean = true | false
-
-type Some(T) = { value: T }
+type Some(T) = [ value: T ]
 type Option(T) = None | Some(T)
 
-type LinkedList(T) = {
+type LinkedList(T) = [
     head: T
     tail: LinkedList(T) | None
-}
+]
 
-type Success(T) = { error: false, value: T }
-type Failure(T) = { error: true, value: T }
+type Success(T) = [ error: false, value: T ]
+type Failure(T) = [ error: true, value: T ]
 type Result(L, R) = Success(L) | Failure(R)
-
-type Elements(T: LinkedList(Any)) = match T {
-    LinkedList(E) => E
-}
-
-type IsSuccess(T: Integer) = match T {
-    Range(200, 299) => true
-    else => false
-}
