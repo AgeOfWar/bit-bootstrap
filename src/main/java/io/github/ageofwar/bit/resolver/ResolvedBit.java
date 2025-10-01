@@ -12,7 +12,6 @@ public sealed interface ResolvedBit {
         Symbol name();
 
         record Variable(Symbol name, Expression value, io.github.ageofwar.bit.types.Type type) implements Declaration {}
-        record VariableAssignment(Symbol name, Expression value) implements Declaration {}
         record Value(Symbol name, Expression value, io.github.ageofwar.bit.types.Type type) implements Declaration {}
         record Function(Symbol name, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) implements Declaration {
             public record Parameter(Symbol name, io.github.ageofwar.bit.types.Type type) {}
@@ -36,6 +35,9 @@ public sealed interface ResolvedBit {
             }
         }
     }
+
+    record VariableAssignment(Symbol name, Expression value) implements ResolvedBit {}
+    record VariableFieldAssignment(Expression struct, String name, Expression value) implements ResolvedBit {}
 
     sealed interface Expression extends ResolvedBit {
         Type type();

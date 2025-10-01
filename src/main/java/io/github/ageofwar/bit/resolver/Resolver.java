@@ -68,7 +68,6 @@ public class Resolver {
     private ResolvedBit.Declaration resolve(Bit.Declaration declaration, ResolverEnvironment environment) {
         return switch (declaration) {
             case Bit.Declaration.Variable variable -> resolve(variable, environment);
-            case Bit.Declaration.VariableAssignment assignment -> resolve(assignment, environment);
             case Bit.Declaration.Value value -> resolve(value, environment);
             case Bit.Declaration.Function function -> resolve(function, environment);
             case Bit.Declaration.Type type -> resolve(type, environment);
@@ -87,16 +86,36 @@ public class Resolver {
         return new ResolvedBit.Declaration.Variable(symbol, resolvedExpression, declaredType);
     }
 
-    private ResolvedBit.Declaration.VariableAssignment resolve(Bit.Declaration.VariableAssignment assignment, ResolverEnvironment environment) {
-        var entry = environment.getVariableType(assignment.name());
-        if (entry == null) {
-            throw new ResolverException("Variable '" + assignment.name() + "' is not defined in the current scope.");
+    private ResolvedBit resolve(Bit.Declaration.VariableAssignment assignment, ResolverEnvironment environment) {
+        var name = assignment.name();
+        if (name instanceof Bit.Expression.Access(var expr, var field)) {
+            var struct = resolve(expr, environment);
+            var structType = struct.type();
+            if (structType instanceof Type.Struct(var fields)) {
+                var type = fields.get(field);
+                if (type == null) {
+                    throw new ResolverException("Field '" + field + "' does not exist on type " + structType);
+                }
+                var resolvedExpression = resolve(assignment.value(), environment);
+                if (!extend(resolvedExpression.type(), type)) {
+                    throw new ResolverException("Type mismatch: expected " + type + " but got " + resolvedExpression.type());
+                }
+                return new ResolvedBit.Declaration.VariableFieldAssignment(struct, field, resolvedExpression);
+            } else {
+                throw new ResolverException("Type '" + structType + "' is not a struct type.");
+            }
+        } else {
+            var entry = environment.getVariableType(((Bit.Expression.Identifier) name).name());
+            if (entry == null) {
+                throw new ResolverException("Variable '" + assignment.name() + "' is not defined in the current scope.");
+            }
+            var type = entry.type();
+            var resolvedExpression = resolve(assignment.value(), environment);
+            if (!extend(resolvedExpression.type(), type)) {
+                throw new ResolverException("Type mismatch: expected " + type + " but got " + resolvedExpression.type());
+            }
+            return new ResolvedBit.Declaration.VariableAssignment(entry.symbol(), resolvedExpression);
         }
-        var resolvedExpression = resolve(assignment.value(), environment);
-        if (!extend(resolvedExpression.type(), entry.type())) {
-            throw new ResolverException("Type mismatch: expected " + entry.type() + " but got " + resolvedExpression.type());
-        }
-        return new ResolvedBit.Declaration.VariableAssignment(entry.symbol(), resolvedExpression);
     }
 
     private ResolvedBit.Declaration.Value resolve(Bit.Declaration.Value declaration, ResolverEnvironment environment) {
@@ -338,6 +357,7 @@ public class Resolver {
                     return switch (statement) {
                         case Bit.Declaration declaration -> resolve(declaration, blockEnvironment);
                         case Bit.Expression expression -> resolve(expression, blockEnvironment);
+                        case Bit.Declaration.VariableAssignment assignment -> resolve(assignment, blockEnvironment);
                         default -> throw new AssertionError(statement);
                     };
                 })

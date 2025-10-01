@@ -41,7 +41,6 @@ public class Interpreter {
     private void interpret(ResolvedBit.Declaration declaration, Environment environment) {
         switch (declaration) {
             case ResolvedBit.Declaration.Variable variable -> interpret(variable, environment);
-            case ResolvedBit.Declaration.VariableAssignment assignment -> interpret(assignment, environment);
             case ResolvedBit.Declaration.Function function -> interpret(function, environment);
             case ResolvedBit.Declaration.Value Object -> interpret(Object, environment);
             case ResolvedBit.Declaration.Type type -> interpret(type, environment);
@@ -71,6 +70,10 @@ public class Interpreter {
         environment.assignVariable(assignment.name(), eval(assignment.value(), environment));
     }
 
+    private void interpret(ResolvedBit.Declaration.VariableFieldAssignment assignment, Environment environment) {
+        ((Struct) eval(assignment.struct(), environment)).setField(assignment.name(), eval(assignment.value(), environment));
+    }
+
     private void interpret(ResolvedBit.Declaration.Value value, Environment environment) {
         environment.assignVariable(value.name(), eval(value.value(), environment));
     }
@@ -92,7 +95,6 @@ public class Interpreter {
             for (var declaration : classDeclaration.members()) {
                 switch (declaration.declaration()) {
                     case ResolvedBit.Declaration.Variable v -> fields.put(v.name().name(), eval(v.value(), environment));
-                    case ResolvedBit.Declaration.VariableAssignment a -> throw new AssertionError();
                     case ResolvedBit.Declaration.Value v -> fields.put(v.name().name(), eval(v.value(), environment));
                     case ResolvedBit.Declaration.Function f -> fields.put(f.name().name(), (Function<List<Object>, Object>) a -> {
                         environment.assignVariable(classDeclaration.thisSymbol(), new Struct(fields));
@@ -189,6 +191,8 @@ public class Interpreter {
                     if (result == Action.BREAK || result == Action.CONTINUE || result instanceof Return) return result;
                 }
                 case ResolvedBit.Declaration declaration -> interpret(declaration, environment);
+                case ResolvedBit.Declaration.VariableAssignment assignment -> interpret(assignment, environment);
+                case ResolvedBit.Declaration.VariableFieldAssignment assignment -> interpret(assignment, environment);
                 default -> throw new IllegalStateException("Unexpected statement " + statement);
             }
         }

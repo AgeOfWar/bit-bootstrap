@@ -8,6 +8,10 @@ public record Struct(Map<String, Object> fields) {
         return fields.get(fieldName);
     }
 
+    public void setField(String fieldName, Object value) {
+        fields.put(fieldName, value);
+    }
+
     @Override
     public String toString() {
         var joiner = new StringJoiner(", ", "[", "]");

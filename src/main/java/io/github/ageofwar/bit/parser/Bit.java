@@ -29,7 +29,6 @@ public sealed interface Bit {
         String name();
 
         record Variable(String name, Expression value, TypeExpression type) implements Declaration {}
-        record VariableAssignment(String name, Expression value) implements Declaration {}
         record Value(String name, Expression value, TypeExpression type) implements Declaration {}
         record Function(String name, List<Parameter> parameters, Expression body, TypeExpression returnType) implements Declaration {
             public record Parameter(String name, TypeExpression type) {}
@@ -49,6 +48,8 @@ public sealed interface Bit {
         }
         record Implementation(String name, List<Function> extensions) implements Declaration {}
     }
+
+    record VariableAssignment(Bit.Expression name, Expression value) implements Bit {}
 
     sealed interface Expression extends Bit {
         record Identifier(String name) implements Expression {}

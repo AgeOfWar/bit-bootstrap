@@ -70,7 +70,6 @@ public class Parser {
                         case TYPE -> statements.add(typeParser.nextTypeDeclaration());
                         case CLASS -> statements.add(nextClassDeclaration());
                         case VAR -> statements.add(nextVariableDeclaration());
-                        case SET -> statements.add(nextVariableAssignment());
                         case IMPLEMENT -> statements.add(nextImplementation());
                         default -> throw error("Expected declaration");
                     }
@@ -131,10 +130,13 @@ public class Parser {
 
     private Bit.Declaration.VariableAssignment nextVariableAssignment() {
         expect(tokens, Token.Keyword.Type.SET);
-        var identifier = expect(tokens, Token.Identifier.class);
+        var identifier = nextExpression();
+        if (!(identifier instanceof Bit.Expression.Identifier) && !(identifier instanceof Bit.Expression.Access)) {
+            throw error("Expected identifier for variable assignment, but got: " + identifier);
+        }
         expect(tokens, Token.Assign.class);
         var value = nextExpression();
-        return new Bit.Declaration.VariableAssignment(identifier.name(), value);
+        return new Bit.Declaration.VariableAssignment(identifier, value);
     }
 
     private Bit.Declaration.Value nextValueDeclaration() {
@@ -244,16 +246,13 @@ public class Parser {
                 visibility = Bit.Declaration.Class.Member.Visibility.PRIVATE;
                 tokens.next();
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             } else if (matches(tokens, Token.Keyword.Type.PUBLIC)) {
                 tokens.next();
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             } else {
                 var declaration = nextDeclaration();
-                if (declaration instanceof Bit.Declaration.VariableAssignment) throw error("Cannot use assignment in class initialization");
                 if (declaration instanceof Bit.Declaration.Value) visibility = Bit.Declaration.Class.Member.Visibility.PRIVATE;
                 members.add(new Bit.Declaration.Class.Member(declaration, visibility));
             }
@@ -448,6 +447,7 @@ public class Parser {
                 case BREAK -> nextBreak();
                 case CONTINUE -> nextContinue();
                 case IF, WHILE, NEW -> nextExpression();
+                case SET -> nextVariableAssignment();
                 default -> nextDeclaration();
             };
             case Token.Identifier identifier -> tokens[1] instanceof Token.Assign || tokens[1] instanceof Token.Colon ? nextValueDeclaration() : nextExpression();
@@ -462,7 +462,6 @@ public class Parser {
                 case TYPE -> typeParser.nextTypeDeclaration();
                 case CLASS -> nextClassDeclaration();
                 case VAR -> nextVariableDeclaration();
-                case SET -> nextVariableAssignment();
                 case IMPLEMENT -> nextImplementation();
                 default -> throw error("Expected declaration");
             };

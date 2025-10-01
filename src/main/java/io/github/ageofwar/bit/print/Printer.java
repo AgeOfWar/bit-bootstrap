@@ -12,6 +12,7 @@ public class Printer {
             case Bit.Declaration declaration -> printDeclaration(declaration);
             case Bit.Expression expression -> printExpression(expression);
             case Bit.TypeExpression typeExpression -> printTypeExpression(typeExpression);
+            case Bit.Declaration.VariableAssignment assignment -> printVariableAssignment(assignment);
         };
     }
 
@@ -33,7 +34,6 @@ public class Printer {
     private String printDeclaration(Bit.Declaration declaration) {
         return switch (declaration) {
             case Bit.Declaration.Variable variable -> printVariableDeclaration(variable);
-            case Bit.Declaration.VariableAssignment assignment -> printVariableAssignment(assignment);
             case Bit.Declaration.Value value -> printValueDeclaration(value);
             case Bit.Declaration.Function function -> printFunctionDeclaration(function);
             case Bit.Declaration.Type type -> printTypeDeclaration(type);

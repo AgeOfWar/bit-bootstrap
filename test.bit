@@ -1,9 +1,5 @@
-fun main(): Integer {
-    var i: Integer = 0
-    while (true) {
-        if (i > 9) return 2
-        print(i)
-        set i = i + 1
-    }
-    return 1
+fun main() {
+    x: [a: Integer] = [a: 2, b: 1]
+    set x.a = 1
+    print(x)
 }
