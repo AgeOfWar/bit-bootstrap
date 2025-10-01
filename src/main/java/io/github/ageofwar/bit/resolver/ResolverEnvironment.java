@@ -85,6 +85,11 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareValueType(String name, Type type) {
+        var alreadyDeclared = valueTypes.resolve(name);
+        if (alreadyDeclared != null && alreadyDeclared.variable()) {
+            throw new RuntimeException("Variable with same name already declared: " + name);
+        }
+
         var symbol = new ResolvedBit.Symbol(name, variablesCount);
         valueTypes.declare(name, new VariableType(symbol, type, false));
         incrementVariablesCount();
