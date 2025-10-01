@@ -19,7 +19,7 @@ public class Main {
             // System.out.println(printer.print(program));
             var resolver = new Resolver(new FilePackageResolver());
             var resolvedProgram = resolver.resolve(program);
-            var interpreter = new Interpreter(new FilePackageResolver());
+            var interpreter = new Interpreter();
             interpreter.interpret(resolvedProgram, "main");
         }
     }

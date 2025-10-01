@@ -109,6 +109,7 @@ public class Printer {
             case Bit.Expression.Multiply multiply -> printBinaryExpression("*", multiply.lhs(), multiply.rhs());
             case Bit.Expression.Divide divide -> printBinaryExpression("/", divide.lhs(), divide.rhs());
             case Bit.Expression.If ifExpression -> printIf(ifExpression);
+            case Bit.Expression.While whileExpression -> printWhile(whileExpression);
             case Bit.Expression.GreaterThan greaterThan -> printGreaterThan(greaterThan);
             case Bit.Expression.LessThan lessThan -> printLessThan(lessThan);
             case Bit.Expression.GreaterThanOrEqual greaterThanOrEqual -> printGreaterThanOrEqual(greaterThanOrEqual);
@@ -124,6 +125,9 @@ public class Printer {
             case Bit.Expression.Not not -> "!" + printExpression(not.expression());
             case Bit.Expression.Function function -> printFunction(function);
             case Bit.Expression.Instantiation instantiation -> "new " + instantiation.className() + "(" + String.join(", ", instantiation.arguments().stream().map(this::printExpression).toList()) + ")";
+            case Bit.Expression.Break _break -> "break";
+            case Bit.Expression.Continue _continue -> "continue";
+            case Bit.Expression.Return _return -> "return " + printExpression(_return.value());
         };
     }
 
@@ -264,6 +268,10 @@ public class Printer {
             sb.append(" else ").append(printExpression(ifExpression.elseBranch()));
         }
         return sb.toString();
+    }
+
+    private String printWhile(Bit.Expression.While whileExpression) {
+        return "while (" + printExpression(whileExpression.condition()) + ") " + printExpression(whileExpression.body());
     }
 
     private String printStruct(Bit.Expression.Struct struct) {

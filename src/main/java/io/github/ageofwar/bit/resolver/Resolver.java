@@ -129,6 +129,10 @@ public class Resolver {
         var symbol = environment.declareValueType(function.name(), functionType);
 
         var body = resolve(function.body(), bodyEnvironment);
+        var inferredReturnType = union(body.type(), body.returnType());
+        if (!extend(inferredReturnType, returnType)) {
+            throw new ResolverException("Type mismatch: expected " + returnType + " but got " + inferredReturnType);
+        }
         return new ResolvedBit.Declaration.Function(symbol, parameters, body, functionType);
     }
 
@@ -275,18 +279,35 @@ public class Resolver {
             case Bit.Expression.Or or -> resolve(or, environment);
             case Bit.Expression.Not not -> resolve(not, environment);
             case Bit.Expression.If ifExpr -> resolve(ifExpr, environment);
+            case Bit.Expression.While whileExpr -> resolve(whileExpr, environment);
             case Bit.Expression.As as -> resolve(as, environment);
             case Bit.Expression.Is is -> resolve(is, environment);
             case Bit.Expression.Access access -> resolve(access, environment);
             case Bit.Expression.Struct struct -> resolve(struct, environment);
             case Bit.Expression.Function function -> resolve(function, environment);
             case Bit.Expression.Instantiation instantiation -> resolve(instantiation, environment);
+            case Bit.Expression.Return returnExpr -> resolve(returnExpr, environment);
+            case Bit.Expression.Break breakExpr -> resolve(breakExpr, environment);
+            case Bit.Expression.Continue continueStmt -> resolve(continueStmt, environment);
         };
+    }
+
+    private ResolvedBit.Expression.Return resolve(Bit.Expression.Return returnExpr, ResolverEnvironment environment) {
+        var value = resolve(returnExpr.value(), environment);
+        return new ResolvedBit.Expression.Return(value, value.type(), value.type());
+    }
+
+    private ResolvedBit.Expression.Break resolve(Bit.Expression.Break breakExpr, ResolverEnvironment environment) {
+        return new ResolvedBit.Expression.Break(none(), never());
+    }
+
+    private ResolvedBit.Expression.Continue resolve(Bit.Expression.Continue continueStmt, ResolverEnvironment environment) {
+        return new ResolvedBit.Expression.Continue(none(), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Identifier identifier, ResolverEnvironment environment) {
         var entry = environment.getValueType(identifier.name());
-        return new ResolvedBit.Expression.Identifier(entry.symbol(), entry.type());
+        return new ResolvedBit.Expression.Identifier(entry.symbol(), entry.type(), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Call call, ResolverEnvironment environment) {
@@ -307,36 +328,35 @@ public class Resolver {
                 throw new ResolverException("Argument " + (i + 1) + " type mismatch: expected " + expectedType + " but got " + actualType);
             }
         }
-        return new ResolvedBit.Expression.Call(callee, argumentTypes, returnType);
+        return new ResolvedBit.Expression.Call(callee, argumentTypes, returnType, never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Block block, ResolverEnvironment environment) {
         var blockEnvironment = new ResolverEnvironment(environment);
         var statements = block.statements().stream()
                 .map(statement -> {
-                    if (statement instanceof Bit.Declaration declaration) {
-                        return resolve(declaration, blockEnvironment);
-                    } else if (statement instanceof Bit.Expression expression) {
-                        return resolve(expression, blockEnvironment);
-                    } else {
-                        throw new AssertionError(statement);
-                    }
+                    return switch (statement) {
+                        case Bit.Declaration declaration -> resolve(declaration, blockEnvironment);
+                        case Bit.Expression expression -> resolve(expression, blockEnvironment);
+                        default -> throw new AssertionError(statement);
+                    };
                 })
                 .toList();
-        var type = statements.isEmpty() ? none() : ((statements.getLast() instanceof ResolvedBit.Expression expr) ? expr.type() : none());
-        return new ResolvedBit.Expression.Block(statements, type);
+        var lastType = statements.isEmpty() ? none() : ((statements.getLast() instanceof ResolvedBit.Expression expr) ? expr.type() : none());
+        var returnTypes = statements.stream().filter(statement -> statement instanceof ResolvedBit.Expression).map(expression -> ((ResolvedBit.Expression) expression).returnType()).toArray(Type[]::new);
+        return new ResolvedBit.Expression.Block(statements, lastType, union(returnTypes));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.NumberLiteral numberLiteral, ResolverEnvironment environment) {
-        return new ResolvedBit.Expression.NumberLiteral(numberLiteral.value(), integer(numberLiteral.value()));
+        return new ResolvedBit.Expression.NumberLiteral(numberLiteral.value(), integer(numberLiteral.value()), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.StringLiteral stringLiteral, ResolverEnvironment environment) {
-        return new ResolvedBit.Expression.StringLiteral(stringLiteral.value(), string(stringLiteral.value()));
+        return new ResolvedBit.Expression.StringLiteral(stringLiteral.value(), string(stringLiteral.value()), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.BooleanLiteral booleanLiteral, ResolverEnvironment environment) {
-        return new ResolvedBit.Expression.BooleanLiteral(booleanLiteral.value(), booleanLiteral.value() ? _true() : _false());
+        return new ResolvedBit.Expression.BooleanLiteral(booleanLiteral.value(), booleanLiteral.value() ? _true() : _false(), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Minus minus, ResolverEnvironment environment) {
@@ -345,7 +365,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.Minus(lhs, rhs, subtract(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Minus(lhs, rhs, subtract(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Plus plus, ResolverEnvironment environment) {
@@ -354,7 +374,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer or string but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.Plus(lhs, rhs, add(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Plus(lhs, rhs, add(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Multiply multiply, ResolverEnvironment environment) {
@@ -363,7 +383,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.Multiply(lhs, rhs, multiply(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Multiply(lhs, rhs, multiply(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Divide divide, ResolverEnvironment environment) {
@@ -372,7 +392,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.Divide(lhs, rhs, divide(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Divide(lhs, rhs, divide(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.GreaterThan greaterThan, ResolverEnvironment environment) {
@@ -381,7 +401,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.GreaterThan(lhs, rhs, greaterThan(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.GreaterThan(lhs, rhs, greaterThan(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.GreaterThanOrEqual greaterThanOrEqual, ResolverEnvironment environment) {
@@ -390,7 +410,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.GreaterThanOrEqual(lhs, rhs, greaterThanOrEqual(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.GreaterThanOrEqual(lhs, rhs, greaterThanOrEqual(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.LessThan lessThan, ResolverEnvironment environment) {
@@ -399,7 +419,7 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.LessThan(lhs, rhs, lessThan(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.LessThan(lhs, rhs, lessThan(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.LessThanOrEqual lessThanOrEqual, ResolverEnvironment environment) {
@@ -408,19 +428,19 @@ public class Resolver {
         if (!extend(lhs.type(), integer()) || !extend(rhs.type(), integer())) {
             throw new ResolverException("Type mismatch: expected integer but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.LessThanOrEqual(lhs, rhs, lessThanOrEqual(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.LessThanOrEqual(lhs, rhs, lessThanOrEqual(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Equal equal, ResolverEnvironment environment) {
         var lhs = resolve(equal.lhs(), environment);
         var rhs = resolve(equal.rhs(), environment);
-        return new ResolvedBit.Expression.Equal(lhs, rhs, equal(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Equal(lhs, rhs, equal(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.NotEqual notEqual, ResolverEnvironment environment) {
         var lhs = resolve(notEqual.lhs(), environment);
         var rhs = resolve(notEqual.rhs(), environment);
-        return new ResolvedBit.Expression.NotEqual(lhs, rhs, notEqual(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.NotEqual(lhs, rhs, notEqual(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.And and, ResolverEnvironment environment) {
@@ -431,7 +451,7 @@ public class Resolver {
         if (!extend(lhs.type(), _boolean()) || !extend(rhs.type(), _boolean())) {
             throw new ResolverException("Type mismatch: expected boolean but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.And(lhs, rhs, and(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.And(lhs, rhs, and(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Or or, ResolverEnvironment environment) {
@@ -442,7 +462,7 @@ public class Resolver {
         if (!extend(lhs.type(), _boolean()) || !extend(rhs.type(), _boolean())) {
             throw new ResolverException("Type mismatch: expected boolean but got " + lhs.type() + " and " + rhs.type());
         }
-        return new ResolvedBit.Expression.Or(lhs, rhs, or(lhs.type(), rhs.type()));
+        return new ResolvedBit.Expression.Or(lhs, rhs, or(lhs.type(), rhs.type()), union(lhs.returnType(), rhs.returnType()));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Not not, ResolverEnvironment environment) {
@@ -450,7 +470,7 @@ public class Resolver {
         if (!extend(expr.type(), _boolean())) {
             throw new ResolverException("Type mismatch: expected boolean but got " + expr.type());
         }
-        return new ResolvedBit.Expression.Not(expr, not(expr.type()));
+        return new ResolvedBit.Expression.Not(expr, not(expr.type()), expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.If ifExpr, ResolverEnvironment environment) {
@@ -467,7 +487,21 @@ public class Resolver {
         var elseBranch = ifExpr.elseBranch() != null ? resolve(ifExpr.elseBranch(), elseEnvironment) : null;
 
         var type = elseBranch == null ? union(thenBranch.type(), none()) : union(thenBranch.type(), elseBranch.type());
-        return new ResolvedBit.Expression.If(condition, thenBranch, elseBranch, type);
+        var returnType = elseBranch == null ? thenBranch.returnType() : union(thenBranch.returnType(), elseBranch.returnType());
+        return new ResolvedBit.Expression.If(condition, thenBranch, elseBranch, type, returnType);
+    }
+
+    private ResolvedBit.Expression.While resolve(Bit.Expression.While whileExpr, ResolverEnvironment environment) {
+        var condition = resolve(whileExpr.condition(), environment);
+        if (!extend(condition.type(), _boolean())) {
+            throw new ResolverException("Type mismatch: expected boolean but got " + condition.type());
+        }
+
+        var bodyEnvironment = new ResolverEnvironment(environment);
+        doRefine(condition, bodyEnvironment, null);
+
+        var body = resolve(whileExpr.body(), bodyEnvironment);
+        return new ResolvedBit.Expression.While(condition, body, none(), body.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.As as, ResolverEnvironment environment) {
@@ -476,19 +510,19 @@ public class Resolver {
         if (!extend(type, expr.type()) && !extend(expr.type(), type)) {
             throw new ResolverException("Type mismatch: cannot cast " + expr.type() + " to " + type);
         }
-        return new ResolvedBit.Expression.As(expr, type);
+        return new ResolvedBit.Expression.As(expr, type, expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Is is, ResolverEnvironment environment) {
         var expr = resolve(is.expression(), environment);
         var type = resolve(is.type(), environment);
         if (extend(expr.type(), type)) {
-            new ResolvedBit.Expression.Is(expr, _true());
+            new ResolvedBit.Expression.Is(expr, _true(), expr.returnType());
         }
         if (!extend(type, expr.type())) {
-            new ResolvedBit.Expression.Is(expr, _false());
+            new ResolvedBit.Expression.Is(expr, _false(), expr.returnType());
         }
-        return new ResolvedBit.Expression.Is(expr, type);
+        return new ResolvedBit.Expression.Is(expr, type, expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Access access, ResolverEnvironment environment) {
@@ -501,7 +535,7 @@ public class Resolver {
         if (fieldType == null) {
             return resolveExtensions(access, environment);
         }
-        return new ResolvedBit.Expression.Access(expr, access.field(), fieldType);
+        return new ResolvedBit.Expression.Access(expr, access.field(), fieldType, expr.returnType());
     }
 
     private ResolvedBit.Expression resolveExtensions(Bit.Expression.Access access, ResolverEnvironment environment) {
@@ -520,19 +554,21 @@ public class Resolver {
             throw new ResolverException("Ambiguous method call: type '" + expr.type() + "' has multiple methods named '" + access.field() + "'.");
         }
         var functionType = functionTypes.getFirst();
-        return new ResolvedBit.Expression.AccessExtension(expr, functionType.symbol(), functionType.type());
+        return new ResolvedBit.Expression.AccessExtension(expr, functionType.symbol(), functionType.type(), expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Struct struct, ResolverEnvironment environment) {
         var fieldTypes = new HashMap<String, Type>();
         var resolvedFields = new HashMap<String, ResolvedBit.Expression>();
+        var returnTypes = new ArrayList<Type>();
         for (var entry : struct.fields().entrySet()) {
             var fieldName = entry.getKey();
             var fieldExpr = resolve(entry.getValue(), environment);
             fieldTypes.put(fieldName, fieldExpr.type());
             resolvedFields.put(fieldName, fieldExpr);
+            returnTypes.add(fieldExpr.returnType());
         }
-        return new ResolvedBit.Expression.Struct(resolvedFields, struct(fieldTypes));
+        return new ResolvedBit.Expression.Struct(resolvedFields, struct(fieldTypes), union(returnTypes.toArray(Type[]::new)));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Function function, ResolverEnvironment environment) {
@@ -549,10 +585,11 @@ public class Resolver {
         var functionType = function(returnType, parameters.stream().map(ResolvedBit.Expression.Function.Parameter::type).toArray(Type[]::new));
 
         var body = resolve(function.body(), bodyEnvironment);
-        if (!extend(body.type(), returnType)) {
-            throw new ResolverException("Type mismatch: expected " + returnType + " but got " + body.type());
+        var inferredReturnType = union(body.type(), body.returnType());
+        if (!extend(inferredReturnType, returnType)) {
+            throw new ResolverException("Type mismatch: expected " + returnType + " but got " + inferredReturnType);
         }
-        return new ResolvedBit.Expression.Function(parameters, body, functionType);
+        return new ResolvedBit.Expression.Function(parameters, body, functionType, never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Instantiation instantiation, ResolverEnvironment environment) {
@@ -576,7 +613,8 @@ public class Resolver {
                 throw new ResolverException("Argument " + (i + 1) + " type mismatch: expected " + expectedType + " but got " + actualType);
             }
         }
-        return new ResolvedBit.Expression.Instantiation(entry.symbol(), argumentTypes, returnType);
+        var returnTypes = argumentTypes.stream().map(ResolvedBit.Expression::returnType).toArray(Type[]::new);
+        return new ResolvedBit.Expression.Instantiation(entry.symbol(), argumentTypes, returnType, union(returnTypes));
     }
 
     // type expressions

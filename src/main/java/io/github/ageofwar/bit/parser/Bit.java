@@ -47,8 +47,7 @@ public sealed interface Bit {
                 public record Parameter(String name, TypeExpression type) {}
             }
         }
-        record Implementation(String name, List<Function> extensions) implements Declaration {
-        }
+        record Implementation(String name, List<Function> extensions) implements Declaration {}
     }
 
     sealed interface Expression extends Bit {
@@ -72,6 +71,7 @@ public sealed interface Bit {
         record Or(Expression lhs, Expression rhs) implements Expression {}
         record Not(Expression expression) implements Expression {}
         record If(Expression condition, Expression thenBranch, Expression elseBranch) implements Expression {}
+        record While(Expression condition, Expression body) implements Expression {}
         record As(Expression expression, TypeExpression type) implements Expression {}
         record Is(Expression expression, TypeExpression type) implements Expression {}
         record Access(Expression expression, String field) implements Expression {}
@@ -80,6 +80,10 @@ public sealed interface Bit {
             public record Parameter(String name, TypeExpression type) {}
         }
         record Instantiation(String className, List<Expression> arguments) implements Expression {}
+
+        record Break() implements Expression {}
+        record Continue() implements Expression {}
+        record Return(Expression value) implements Expression {}
     }
 
     sealed interface TypeExpression extends Bit {

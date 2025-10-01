@@ -36,6 +36,7 @@ public sealed interface Token {
         public enum Type {
             IF("if"),
             ELSE("else"),
+            WHILE("while"),
             FUNCTION("fun"),
             TYPE("type"),
             MATCH("match"),
@@ -46,6 +47,9 @@ public sealed interface Token {
             NOT("not"),
             CLASS("class"),
             NEW("new"),
+            RETURN("return"),
+            BREAK("break"),
+            CONTINUE("continue"),
             PUBLIC("public"),
             PRIVATE("private"),
             VAR("var"),

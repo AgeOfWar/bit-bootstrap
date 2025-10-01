@@ -156,7 +156,7 @@ public class Parser {
         skipNewLines();
         var statements = new java.util.ArrayList<Bit>();
         while (!(tokens.peek() instanceof Token.RightBrace)) {
-            statements.add(nextDeclarationOrExpression());
+            statements.add(nextBlockElement());
             skipNewLines();
         }
         expect(tokens, Token.RightBrace.class);
@@ -355,7 +355,11 @@ public class Parser {
             case Token.Keyword(var type) -> switch (type) {
                 case NOT -> new Bit.Expression.Not(nextExpression(precedence(peek[0])));
                 case IF -> nextIfExpression();
+                case WHILE -> nextWhileExpression();
                 case NEW -> nextInstantiation();
+                case BREAK -> nextBreak();
+                case CONTINUE -> nextContinue();
+                case RETURN -> nextReturn();
                 default -> throw error("Unexpected keyword: " + type);
             };
             case Token.Identifier token -> nextIdentifier();
@@ -408,6 +412,16 @@ public class Parser {
         return new Bit.Expression.If(condition, thenBranch, elseBranch);
     }
 
+    private Bit.Expression.While nextWhileExpression() {
+        expect(tokens, Token.Keyword.Type.WHILE);
+        expect(tokens, Token.LeftParenthesis.class);
+        var condition = nextExpression();
+        expect(tokens, Token.RightParenthesis.class);
+        skipNewLines();
+        var body = nextExpression();
+        return new Bit.Expression.While(condition, body);
+    }
+
     private Bit.Expression.Struct nextStruct() {
         expect(tokens, Token.LeftBracket.class);
         skipNewLines();
@@ -426,12 +440,19 @@ public class Parser {
         return new Bit.Expression.Struct(fields);
     }
 
-    private Bit nextDeclarationOrExpression() {
+    private Bit nextBlockElement() {
         var tokens = this.tokens.peek(2);
-        if (tokens[0] instanceof Token.Keyword(var type) && type != Token.Keyword.Type.IF && type != Token.Keyword.Type.NEW) {
-            return nextDeclaration();
-        }
-        return tokens[1] instanceof Token.Assign || tokens[1] instanceof Token.Colon ? nextValueDeclaration() : nextExpression();
+        return switch (tokens[0]) {
+            case Token.Keyword(var type) -> switch (type) {
+                case RETURN -> nextReturn();
+                case BREAK -> nextBreak();
+                case CONTINUE -> nextContinue();
+                case IF, WHILE, NEW -> nextExpression();
+                default -> nextDeclaration();
+            };
+            case Token.Identifier identifier -> tokens[1] instanceof Token.Assign || tokens[1] instanceof Token.Colon ? nextValueDeclaration() : nextExpression();
+            default -> nextExpression();
+        };
     }
 
     private Bit.Declaration nextDeclaration() {
@@ -488,6 +509,25 @@ public class Parser {
         expect(tokens, Token.Arrow.class);
         var body = nextExpression();
         return new Bit.Expression.Function(parameters, body, returnType);
+    }
+
+    private Bit.Expression.Break nextBreak() {
+        expect(tokens, Token.Keyword.Type.BREAK);
+        return new Bit.Expression.Break();
+    }
+
+    private Bit.Expression.Continue nextContinue() {
+        expect(tokens, Token.Keyword.Type.CONTINUE);
+        return new Bit.Expression.Continue();
+    }
+
+    private Bit.Expression.Return nextReturn() {
+        expect(tokens, Token.Keyword.Type.RETURN);
+        if (tokens.peek() instanceof Token.NewLine || tokens.peek() instanceof Token.RightBrace) {
+            return new Bit.Expression.Return(new Bit.Expression.Identifier("None"));
+        }
+        var value = nextExpression();
+        return new Bit.Expression.Return(value);
     }
 
     private void skipNewLines() {

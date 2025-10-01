@@ -39,36 +39,42 @@ public sealed interface ResolvedBit {
 
     sealed interface Expression extends ResolvedBit {
         Type type();
+        Type returnType();
 
-        record Identifier(Symbol name, Type type) implements Expression {}
-        record Call(Expression callee, List<Expression> arguments, Type type) implements Expression {}
-        record Block(List<ResolvedBit> statements, Type type) implements Expression {}
-        record NumberLiteral(String value, Type type) implements Expression {}
-        record StringLiteral(String value, Type type) implements Expression {}
-        record BooleanLiteral(boolean value, Type type) implements Expression {}
-        record Minus(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Plus(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Multiply(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Divide(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record GreaterThan(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record GreaterThanOrEqual(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record LessThan(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record LessThanOrEqual(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Equal(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record NotEqual(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record And(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Or(Expression lhs, Expression rhs, Type type) implements Expression {}
-        record Not(Expression expression, Type type) implements Expression {}
-        record If(Expression condition, Expression thenBranch, Expression elseBranch, Type type) implements Expression {}
-        record As(Expression expression, Type type) implements Expression {}
-        record Is(Expression expression, Type type) implements Expression {}
-        record Access(Expression expression, String field, Type type) implements Expression {}
-        record AccessExtension(Expression expression, Symbol name, Type type) implements Expression {}
-        record Struct(Map<String, Expression> fields, Type type) implements Expression {}
-        record Function(List<Parameter> parameters, Expression body, Type type) implements Expression {
+        record Identifier(Symbol name, Type type, Type returnType) implements Expression {}
+        record Call(Expression callee, List<Expression> arguments, Type type, Type returnType) implements Expression {}
+        record Block(List<ResolvedBit> statements, Type type, Type returnType) implements Expression {}
+        record NumberLiteral(String value, Type type, Type returnType) implements Expression {}
+        record StringLiteral(String value, Type type, Type returnType) implements Expression {}
+        record BooleanLiteral(boolean value, Type type, Type returnType) implements Expression {}
+        record Minus(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Plus(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Multiply(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Divide(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record GreaterThan(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record GreaterThanOrEqual(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record LessThan(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record LessThanOrEqual(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Equal(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record NotEqual(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record And(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Or(Expression lhs, Expression rhs, Type type, Type returnType) implements Expression {}
+        record Not(Expression expression, Type type, Type returnType) implements Expression {}
+        record If(Expression condition, Expression thenBranch, Expression elseBranch, Type type, Type returnType) implements Expression {}
+        record While(Expression condition, Expression body, Type type, Type returnType) implements Expression {}
+        record As(Expression expression, Type type, Type returnType) implements Expression {}
+        record Is(Expression expression, Type type, Type returnType) implements Expression {}
+        record Access(Expression expression, String field, Type type, Type returnType) implements Expression {}
+        record AccessExtension(Expression expression, Symbol name, Type type, Type returnType) implements Expression {}
+        record Struct(Map<String, Expression> fields, Type type, Type returnType) implements Expression {}
+        record Function(List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
             public record Parameter(Symbol name, Type type) {}
         }
-        record Instantiation(Symbol className, List<Expression> arguments, Type type) implements Expression {}
+        record Instantiation(Symbol className, List<Expression> arguments, Type type, Type returnType) implements Expression {}
+
+        record Break(Type type, Type returnType) implements Expression {}
+        record Continue(Type type, Type returnType) implements Expression {}
+        record Return(Expression value, Type type, Type returnType) implements Expression {}
     }
 
     final class Symbol {

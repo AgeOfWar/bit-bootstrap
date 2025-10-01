@@ -1,10 +1,8 @@
 package io.github.ageofwar.bit.interpreter;
 
-import io.github.ageofwar.bit.packages.PackageResolver;
 import io.github.ageofwar.bit.resolver.ResolvedBit;
 import io.github.ageofwar.bit.types.Type;
 
-import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,12 +13,6 @@ import java.util.stream.Collectors;
 import static io.github.ageofwar.bit.types.Types.*;
 
 public class Interpreter {
-    private final PackageResolver packageResolver;
-
-    public Interpreter(PackageResolver packageResolver) {
-        this.packageResolver = packageResolver;
-    }
-
     @SuppressWarnings("unchecked")
     public void interpret(ResolvedBit.Program program, String mainFunctionName) {
         var environment = Environment.init(program.variables());
@@ -63,7 +55,11 @@ public class Interpreter {
             for (var i = 0; i < function.parameters().size(); i++) {
                 environment.assignVariable(function.parameters().get(i).name(), args.get(i));
             }
-            return eval(function.body(), environment);
+            var result = eval(function.body(), environment);
+            if (result instanceof Return(var value)) {
+                return value;
+            }
+            return result;
         });
     }
 
@@ -103,7 +99,11 @@ public class Interpreter {
                         for (var i = 0; i < f.parameters().size(); i++) {
                             environment.assignVariable(f.parameters().get(i).name(), a.get(i));
                         }
-                        return eval(f.body(), environment);
+                        var result = eval(f.body(), environment);
+                        if (result instanceof Return(var value)) {
+                            return value;
+                        }
+                        return result;
                     });
                     case ResolvedBit.Declaration.Type t -> interpret(t, environment);
                     case ResolvedBit.Declaration.Class c -> interpret(c, environment);
@@ -123,7 +123,11 @@ public class Interpreter {
                 for (var i = 1; i < function.parameters().size(); i++) {
                     environment.assignVariable(function.parameters().get(i - 1).name(), args.get(i));
                 }
-                return eval(function.body(), environment);
+                var result = eval(function.body(), environment);
+                if (result instanceof Return(var value)) {
+                    return value;
+                }
+                return result;
             });
         }
     }
@@ -143,6 +147,7 @@ public class Interpreter {
             case ResolvedBit.Expression.Multiply multiply -> eval(multiply, environment);
             case ResolvedBit.Expression.Divide divide -> eval(divide, environment);
             case ResolvedBit.Expression.If ifExpression -> eval(ifExpression, environment);
+            case ResolvedBit.Expression.While whileExpression -> eval(whileExpression, environment);
             case ResolvedBit.Expression.GreaterThan greaterThan -> eval(greaterThan, environment);
             case ResolvedBit.Expression.GreaterThanOrEqual greaterThanOrEqual -> eval(greaterThanOrEqual, environment);
             case ResolvedBit.Expression.LessThan lessThan -> eval(lessThan, environment);
@@ -159,6 +164,9 @@ public class Interpreter {
             case ResolvedBit.Expression.Function function -> eval(function, environment);
             case ResolvedBit.Expression.Instantiation instantiation -> eval(instantiation, environment);
             case ResolvedBit.Expression.AccessExtension access -> eval(access, environment);
+            case ResolvedBit.Expression.Break ignored -> Action.BREAK;
+            case ResolvedBit.Expression.Continue ignored -> Action.CONTINUE;
+            case ResolvedBit.Expression.Return returnExpression -> new Return(eval(returnExpression.value(), environment));
         };
     }
 
@@ -175,10 +183,13 @@ public class Interpreter {
     private Object eval(ResolvedBit.Expression.Block block, Environment environment) {
         Object result = null;
         for (var statement : block.statements()) {
-            if (statement instanceof ResolvedBit.Expression expression) {
-                result = eval(expression, environment);
-            } else {
-                interpret((ResolvedBit.Declaration) statement, environment);
+            switch (statement) {
+                case ResolvedBit.Expression expression -> {
+                    result = eval(expression, environment);
+                    if (result == Action.BREAK || result == Action.CONTINUE || result instanceof Return) return result;
+                }
+                case ResolvedBit.Declaration declaration -> interpret(declaration, environment);
+                default -> throw new IllegalStateException("Unexpected statement " + statement);
             }
         }
         return result;
@@ -197,7 +208,7 @@ public class Interpreter {
     }
 
     private Object eval(ResolvedBit.Expression.BooleanLiteral booleanLiteral) {
-        return booleanLiteral;
+        return booleanLiteral.value();
     }
 
     private Object eval(ResolvedBit.Expression.Minus minus, Environment environment) {
@@ -234,6 +245,14 @@ public class Interpreter {
         } else {
             return ifExpression.elseBranch() != null ? eval(ifExpression.elseBranch(), environment) : none();
         }
+    }
+
+    private Object eval(ResolvedBit.Expression.While whileExpression, Environment environment) {
+        while ((boolean) eval(whileExpression.condition(), environment)) {
+            var iterationResult = eval(whileExpression.body(), environment);
+            if (iterationResult == Action.BREAK || iterationResult instanceof Return) break;
+        }
+        return none();
     }
 
     private Object eval(ResolvedBit.Expression.GreaterThan greaterThan, Environment environment) {
@@ -335,7 +354,11 @@ public class Interpreter {
             for (var i = 0; i < function.parameters().size(); i++) {
                 environment.assignVariable(function.parameters().get(i).name(), args.get(i));
             }
-            return eval(function.body(), environment);
+            var result = eval(function.body(), environment);
+            if (result instanceof Return(var value)) {
+                return value;
+            }
+            return result;
         };
     }
 
@@ -380,4 +403,7 @@ public class Interpreter {
 
         return false;
     }
+
+    private enum Action { BREAK, CONTINUE }
+    private record Return(Object value) {}
 }
