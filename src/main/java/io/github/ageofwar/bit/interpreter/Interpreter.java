@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.github.ageofwar.bit.types.Types.*;
 
@@ -51,8 +52,12 @@ public class Interpreter {
 
     private void interpret(ResolvedBit.Declaration.Function function, Environment environment) {
         environment.assignVariable(function.name(), (Function<List<Object>, Object>) args -> {
+            for (var i = 0; i < function.generics().size(); i++) {
+                environment.assignVariable(function.generics().get(i).name(), args.get(i));
+            }
+            var offset = function.generics().size();
             for (var i = 0; i < function.parameters().size(); i++) {
-                environment.assignVariable(function.parameters().get(i).name(), args.get(i));
+                environment.assignVariable(function.parameters().get(i).name(), args.get(offset + i));
             }
             var result = eval(function.body(), environment);
             if (result instanceof Return(var value)) {
@@ -179,7 +184,7 @@ public class Interpreter {
     @SuppressWarnings("unchecked")
     private Object eval(ResolvedBit.Expression.Call call, Environment environment) {
         var callee = (Function<List<Object>, Object>) eval(call.callee(), environment);
-        return callee.apply(call.arguments().stream().map(a -> eval(a, environment)).toList());
+        return callee.apply(Stream.concat(call.generics().stream(), call.arguments().stream().map(a -> eval(a, environment))).toList());
     }
 
     private Object eval(ResolvedBit.Expression.Block block, Environment environment) {
@@ -304,7 +309,7 @@ public class Interpreter {
     private Object eval(ResolvedBit.Expression.As asExpression, Environment environment) {
         var value = eval(asExpression.expression(), environment);
         var type = asExpression.type();
-        if (!isAssignable(value, type)) {
+        if (!isAssignable(value, type, environment)) {
             throw new RuntimeException("Cannot cast " + value + " to type " + type);
         }
         return value;
@@ -313,7 +318,7 @@ public class Interpreter {
     private Object eval(ResolvedBit.Expression.Is isExpression, Environment environment) {
         var value = eval(isExpression.expression(), environment);
         var type = isExpression.type();
-        return isAssignable(value, type);
+        return isAssignable(value, type, environment);
     }
 
     private Object eval(ResolvedBit.Expression.Access access, Environment environment) {
@@ -374,9 +379,13 @@ public class Interpreter {
 
     // is assignable
 
-    public static boolean isAssignable(Object value, Type type) {
+    public static boolean isAssignable(Object value, Type type, Environment environment) {
         if (type == any()) return true;
         if (type == never()) return false;
+
+        if (type instanceof Type.TypeVariable typeVariable) {
+            return isAssignable(value, (Type) environment.get(typeVariable.name()), environment);
+        }
 
         if (value instanceof BigInteger bigInteger) {
             return extend(integer(bigInteger), type);
@@ -394,7 +403,7 @@ public class Interpreter {
             if (!(type instanceof Type.Struct(var typeFields))) return false;
             for (var entry : fields.entrySet()) {
                 var fieldType = typeFields.get(entry.getKey());
-                if (fieldType == null || !isAssignable(entry.getValue(), fieldType)) {
+                if (fieldType == null || !isAssignable(entry.getValue(), fieldType, environment)) {
                     return false;
                 }
             }

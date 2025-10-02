@@ -1,5 +1,7 @@
 package io.github.ageofwar.bit.types;
 
+import io.github.ageofwar.bit.resolver.ResolvedBit;
+
 import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Stream;
@@ -65,7 +67,11 @@ public class Types {
     }
 
     public static Type function(Type returnType, Type... parameters) {
-        return new Type.Function(returnType, parameters);
+        return new Type.Function(returnType, List.of(), parameters);
+    }
+
+    public static Type function(Type returnType, List<Type.TypeVariable> generics, Type... parameters) {
+        return new Type.Function(returnType, generics, parameters);
     }
 
     public static Type nominal(String name) {
@@ -134,6 +140,41 @@ public class Types {
         return new Type.Intersection(actualTypes.toArray(Type[]::new));
     }
 
+    public static Type.TypeVariable generic(Type extendsType) {
+        return new Type.TypeVariable(extendsType);
+    }
+
+    public static Type complete(Type type, List<Type> arguments) {
+        if (!(type instanceof Type.Function(var returnType, var generics, var parameters))) {
+            throw new IllegalArgumentException("Type is not a function type: " + type);
+        }
+
+        if (generics.size() != arguments.size()) {
+            throw new IllegalArgumentException("Expected " + generics.size() + " generic arguments, but got " + arguments.size());
+        }
+        var mapping = new HashMap<Type.TypeVariable, Type>();
+        for (var i = 0; i < generics.size(); i++) {
+            var generic = generics.get(i);
+            var argument = arguments.get(i);
+            if (!extend(argument, generic.bounds())) {
+                throw new IllegalArgumentException("Generic argument " + argument + " does not extend " + generic.bounds());
+            }
+            mapping.put(generic, argument);
+        }
+        return complete(type, mapping);
+    }
+
+    private static Type complete(Type type, Map<Type.TypeVariable, Type> mapping) {
+        return switch (type) {
+            case Type.TypeVariable t -> mapping.getOrDefault(type, complete(t.bounds(), mapping));
+            case Type.Union(var types) -> union(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
+            case Type.Intersection(var types) -> intersection(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
+            case Type.Function(var returnType, var generics, var parameters) -> function(complete(returnType, mapping), generics, Stream.of(parameters).map(p -> complete(p, mapping)).toArray(Type[]::new));
+            case Type.Struct(var fields) -> struct(fields.entrySet().stream().collect(HashMap::new, (m, e) -> m.put(e.getKey(), complete(e.getValue(), mapping)), HashMap::putAll));
+            default -> type;
+        };
+    }
+
     private static boolean compatible(Type type, Type other) {
         return switch (type) {
             case Type.Struct struct -> {
@@ -161,6 +202,7 @@ public class Types {
             case Type.Union union -> struct(Map.of("type", string("Union"), "types", union(Stream.of(union.types()).map(Types::typeOf).toArray(Type[]::new))));
             case Type.Intersection intersection -> struct(Map.of("type", string("Intersection"), "types", union(Stream.of(intersection.types()).map(Types::typeOf).toArray(Type[]::new))));
             case Type.Function function -> struct(Map.of("type", string("Function"), "returnType", typeOf(function.returnType()), "parameters", union(Stream.of(function.parameters()).map(Types::typeOf).toArray(Type[]::new))));
+            case Type.TypeVariable typeVariable -> throw new AssertionError();
         };
     }
 
@@ -182,6 +224,7 @@ public class Types {
             case Type.Intersection intersection -> extend(intersection, other);
             case Type.Function function -> extend(function, other);
             case Type.Struct struct -> extend(struct, other);
+            case Type.TypeVariable typeVariable -> extend(typeVariable, other);
         };
     }
 
@@ -227,7 +270,7 @@ public class Types {
     }
 
     private static boolean extend(Type.Function function, Type other) {
-        if (!(other instanceof Type.Function(var returnType, var parameters))) return false;
+        if (!(other instanceof Type.Function(var returnType, var generics, var parameters))) return false;
         if (!extend(function.returnType(), returnType)) return false;
         for (var i = 0;  i < parameters.length; i++) {
             if (!extend(parameters[i], function.parameters()[i])) return false;
@@ -241,6 +284,10 @@ public class Types {
             if (!extend(type.fields().get(entry.getKey()), entry.getValue())) return false;
         }
         return true;
+    }
+
+    public static boolean extend(Type.TypeVariable typeVariable, Type other) {
+        return extend(typeVariable.bounds(), other);
     }
 
     // operations

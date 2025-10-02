@@ -62,10 +62,16 @@ public class Printer {
 
     private String printFunctionDeclaration(Bit.Declaration.Function function) {
         var returnType = !(function.returnType() instanceof Bit.TypeExpression.Identifier(String name)) || !Objects.equals(name, "None") ? ": " + printTypeExpression(function.returnType()) : "";
+        var generics = function.generics().isEmpty() ? "" : printGenerics(function.generics());
         if (function.body() instanceof Bit.Expression.Block) {
-            return "fun " + function.name() + "(" + String.join(", ", function.parameters().stream().map(p -> p.name() + ": " + printTypeExpression(p.type())).toList()) + ")" + returnType + " " + printExpression(function.body());
+            return "fun " + function.name() + generics + "(" + String.join(", ", function.parameters().stream().map(p -> p.name() + ": " + printTypeExpression(p.type())).toList()) + ")" + returnType + " " + printExpression(function.body());
         }
-        return "fun " + function.name() + "(" + String.join(", ", function.parameters().stream().map(p -> p.name() + ": " + printTypeExpression(p.type())).toList()) + ")" + returnType + " = " + printExpression(function.body());
+        return "fun " + function.name() + generics + "(" + String.join(", ", function.parameters().stream().map(p -> p.name() + ": " + printTypeExpression(p.type())).toList()) + ")" + returnType + " = " + printExpression(function.body());
+    }
+
+    private String printGenerics(List<Bit.Declaration.GenericDeclaration> generics) {
+        if (generics.isEmpty()) return "";
+        return "<" + String.join(", ", generics.stream().map(g -> g.name() + (g.extendsType() instanceof Bit.TypeExpression.Identifier(String name) && name.equals("Any") ? "" : ": " + printTypeExpression(g.extendsType()))).toArray(String[]::new)) + "> ";
     }
 
     private String printClassDeclaration(Bit.Declaration.Class classDecl) {
@@ -133,6 +139,9 @@ public class Printer {
 
     private String printCallExpression(Bit.Expression.Call call) {
         var sb = new StringBuilder();
+        if (!call.generics().isEmpty()) {
+            sb.append("<").append(String.join(", ", call.generics().stream().map(this::printTypeExpression).toList())).append(">");
+        }
         sb.append(printExpression(call.callee())).append("(");
         for (int i = 0; i < call.arguments().size(); i++) {
             sb.append(printExpression(call.arguments().get(i)));

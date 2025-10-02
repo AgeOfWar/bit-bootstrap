@@ -134,25 +134,35 @@ public class Resolver {
     }
 
     private ResolvedBit.Declaration.Function resolve(Bit.Declaration.Function function, ResolverEnvironment environment) {
-        var bodyEnvironment = new ResolverEnvironment(environment);
+        var functionEnvironment = new ResolverEnvironment(environment);
+
+        var generics = new ArrayList<ResolvedBit.GenericDeclaration>();
+        for (var generic : function.generics()) {
+            var bounds = resolve(generic.extendsType(), functionEnvironment);
+            var type = generic(bounds);
+            var symbol = functionEnvironment.declareType(generic.name(), type);
+            type.setSymbol(symbol);
+            generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+        }
+
         var parameters = new ArrayList<ResolvedBit.Declaration.Function.Parameter>();
         for (int i = 0; i < function.parameters().size(); i++) {
             var param = function.parameters().get(i);
-            var paramSymbol = bodyEnvironment.declareValueType(param.name(), resolve(param.type(), environment));
-            var paramType = resolve(param.type(), environment);
+            var paramSymbol = functionEnvironment.declareValueType(param.name(), resolve(param.type(), functionEnvironment));
+            var paramType = resolve(param.type(), functionEnvironment);
             parameters.add(new ResolvedBit.Declaration.Function.Parameter(paramSymbol, paramType));
         }
 
-        var returnType = function.returnType() == null ? none() : resolve(function.returnType(), environment);
-        var functionType = function(returnType, parameters.stream().map(ResolvedBit.Declaration.Function.Parameter::type).toArray(Type[]::new));
+        var returnType = function.returnType() == null ? none() : resolve(function.returnType(), functionEnvironment);
+        var functionType = function(returnType, generics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameters.stream().map(ResolvedBit.Declaration.Function.Parameter::type).toArray(Type[]::new));
         var symbol = environment.declareValueType(function.name(), functionType);
 
-        var body = resolve(function.body(), bodyEnvironment);
+        var body = resolve(function.body(), functionEnvironment);
         var inferredReturnType = union(body.type(), body.returnType());
         if (!extend(inferredReturnType, returnType)) {
             throw new ResolverException("Type mismatch: expected " + returnType + " but got " + inferredReturnType);
         }
-        return new ResolvedBit.Declaration.Function(symbol, parameters, body, functionType);
+        return new ResolvedBit.Declaration.Function(symbol, generics, parameters, body, functionType);
     }
 
     private ResolvedBit.Declaration.Class resolve(Bit.Declaration.Class classDeclaration, ResolverEnvironment environment) {
@@ -331,23 +341,31 @@ public class Resolver {
 
     private ResolvedBit.Expression resolve(Bit.Expression.Call call, ResolverEnvironment environment) {
         var callee = resolve(call.callee(), environment);
+        var generics = call.generics() == null ? List.<Type>of() : call.generics().stream()
+                .map(generic -> resolve(generic, environment))
+                .toList();
+        if (!(callee.type() instanceof Type.Function(var returnType, var g, var parameters))) {
+            throw new ResolverException("Type '" + callee.type() + "' is not a function type.");
+        }
+        var genericsCount = g.size();
+        if (generics.size() != genericsCount) {
+            throw new ResolverException("Function expected " + genericsCount + " generics but got " + generics.size() + ".");
+        }
         var argumentTypes = call.arguments().stream()
                 .map(arg -> resolve(arg, environment))
                 .toList();
-        if (!(callee.type() instanceof Type.Function(Type returnType, Type[] parameters))) {
-            throw new ResolverException("Type '" + callee.type() + "' is not a function type.");
-        }
+        var completeFunctionType = (Type.Function) complete(callee.type(), generics);
         if (parameters.length != argumentTypes.size()) {
             throw new ResolverException("Function expected " + parameters.length + " arguments but got " + argumentTypes.size() + ".");
         }
         for (int i = 0; i < parameters.length; i++) {
-            var expectedType = parameters[i];
+            var expectedType = completeFunctionType.parameters()[i];
             var actualType = argumentTypes.get(i).type();
             if (!extend(actualType, expectedType)) {
                 throw new ResolverException("Argument " + (i + 1) + " type mismatch: expected " + expectedType + " but got " + actualType);
             }
         }
-        return new ResolvedBit.Expression.Call(callee, argumentTypes, returnType, never());
+        return new ResolvedBit.Expression.Call(callee, argumentTypes, generics, completeFunctionType.returnType(), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Block block, ResolverEnvironment environment) {
@@ -617,7 +635,7 @@ public class Resolver {
         if (entry == null) {
             throw new ResolverException("Constructor '" + instantiation.className() + "' is not defined in the current scope.");
         }
-        if (!(entry.type() instanceof Type.Function(Type returnType, Type[] parameters))) {
+        if (!(entry.type() instanceof Type.Function(var returnType, var generics, var parameters))) {
             throw new ResolverException("Type '" + entry.type() + "' is not a function type.");
         }
         var argumentTypes = instantiation.arguments().stream()

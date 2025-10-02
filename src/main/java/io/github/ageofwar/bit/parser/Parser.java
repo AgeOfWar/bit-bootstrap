@@ -7,6 +7,7 @@ import io.github.ageofwar.bit.lexer.TokenStream;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import static io.github.ageofwar.bit.parser.Parsers.expect;
 import static io.github.ageofwar.bit.parser.Parsers.matches;
@@ -168,6 +169,29 @@ public class Parser {
     private Bit.Declaration.Function nextFunctionDeclaration() {
         expect(tokens, Token.Keyword.Type.FUNCTION);
         var identifier = expect(tokens, Token.Identifier.class);
+
+        var generics = new ArrayList<Bit.Declaration.GenericDeclaration>();
+        if (matches(tokens, Token.LessThan.class)) {
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericName = expect(tokens, Token.Identifier.class);
+                Bit.TypeExpression genericType = new Bit.TypeExpression.Identifier("Any");
+                if (matches(tokens, Token.Colon.class)) {
+                    tokens.next();
+                    genericType = typeParser.nextExpression();
+                }
+                generics.add(new Bit.Declaration.GenericDeclaration(genericName.name(), genericType));
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
+
         expect(tokens, Token.LeftParenthesis.class);
         var parameters = new ArrayList<Bit.Declaration.Function.Parameter>();
         while (!(tokens.peek() instanceof Token.RightParenthesis)) {
@@ -183,6 +207,7 @@ public class Parser {
             }
         }
         expect(tokens, Token.RightParenthesis.class);
+
         Bit.TypeExpression returnType = new Bit.TypeExpression.Identifier("None");
         if (matches(tokens, Token.Colon.class)) {
             tokens.next();
@@ -192,10 +217,10 @@ public class Parser {
             tokens.next();
             skipNewLines();
             var body = nextExpression();
-            return new Bit.Declaration.Function(identifier.name(), parameters, body, returnType);
+            return new Bit.Declaration.Function(identifier.name(), generics, parameters, body, returnType);
         } else {
             var body = nextBlock();
-            return new Bit.Declaration.Function(identifier.name(), parameters, body, returnType);
+            return new Bit.Declaration.Function(identifier.name(), generics, parameters, body, returnType);
         }
     }
 
@@ -278,6 +303,24 @@ public class Parser {
     }
 
     private Bit.Expression.Call nextCall(Bit.Expression expression) {
+        List<Bit.TypeExpression> generics = null;
+        if (matches(tokens, Token.LessThan.class)) {
+            generics = new ArrayList<>();
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericType = typeParser.nextExpression();
+                generics.add(genericType);
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
+
         expect(tokens, Token.LeftParenthesis.class);
         var arguments = new ArrayList<Bit.Expression>();
         while (!(tokens.peek() instanceof Token.RightParenthesis)) {
@@ -285,7 +328,7 @@ public class Parser {
             if (tokens.peek() instanceof Token.Comma) tokens.next();
         }
         expect(tokens, Token.RightParenthesis.class);
-        return new Bit.Expression.Call(expression, arguments);
+        return new Bit.Expression.Call(expression, arguments, generics);
     }
 
     public Bit.Expression nextExpression() {
@@ -314,9 +357,13 @@ public class Parser {
                 };
                 continue;
             }
-            if (matches(tokens, Token.LeftParenthesis.class)) {
-                lhs = nextCall(lhs);
-                continue;
+            if (matches(tokens, Token.LeftParenthesis.class) || matches(tokens, Token.LessThan.class)) {
+                try {
+                    lhs = nextCall(lhs);
+                    continue;
+                } catch (ParserException ignored) {
+                    ignored.printStackTrace();
+                }
             }
             tokens.next();
             var rhs = nextExpression(nextMinPrecedence);

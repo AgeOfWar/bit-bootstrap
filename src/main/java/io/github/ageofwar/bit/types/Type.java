@@ -1,7 +1,10 @@
 package io.github.ageofwar.bit.types;
 
+import io.github.ageofwar.bit.resolver.ResolvedBit;
+
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public sealed interface Type {
@@ -71,10 +74,36 @@ public sealed interface Type {
             return "(" + java.lang.String.join(" & ", Arrays.stream(types).map(Type::toString).toList()) + ")";
         }
     }
-    record Function(Type returnType, Type... parameters) implements Type {
+    record Function(Type returnType, List<TypeVariable> generics, Type... parameters) implements Type {
         @Override
         public java.lang.String toString() {
-            return "(" + java.lang.String.join(", ", Arrays.stream(parameters).map(Type::toString).toList()) + ") -> " + returnType;
+            var genericsString = generics.isEmpty() ? "" : "<" + java.lang.String.join(", ", generics.stream().map(TypeVariable::toString).toList()) + ">";
+            return genericsString + "(" + java.lang.String.join(", ", Arrays.stream(parameters).map(Type::toString).toList()) + ") -> " + returnType;
+        }
+    }
+    final class TypeVariable implements Type {
+        private final Type bounds;
+        private ResolvedBit.Symbol symbol;
+
+        public TypeVariable(Type bounds) {
+            this.bounds = bounds;
+        }
+
+        @Override
+        public java.lang.String toString() {
+            return symbol + ": " + bounds;
+        }
+
+        public Type bounds() {
+            return bounds;
+        }
+
+        public ResolvedBit.Symbol name() {
+            return symbol;
+        }
+
+        public void setSymbol(ResolvedBit.Symbol symbol) {
+            this.symbol = symbol;
         }
     }
 }

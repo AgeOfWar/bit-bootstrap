@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static io.github.ageofwar.bit.parser.Parsers.expect;
-import static io.github.ageofwar.bit.parser.Parsers.matches;
 
 public class TypeParser {
     private static final Map<Class<? extends Token>, Integer> OPERATOR_PRECEDENCES = Map.ofEntries(
@@ -19,10 +18,6 @@ public class TypeParser {
             new AbstractMap.SimpleEntry<>(Token.Slash.class, 5),
             new AbstractMap.SimpleEntry<>(Token.Minus.class, 4),
             new AbstractMap.SimpleEntry<>(Token.Plus.class, 4),
-            new AbstractMap.SimpleEntry<>(Token.GreaterThan.class, 3),
-            new AbstractMap.SimpleEntry<>(Token.GreaterThanOrEqual.class, 3),
-            new AbstractMap.SimpleEntry<>(Token.LessThan.class, 3),
-            new AbstractMap.SimpleEntry<>(Token.LessThanOrEqual.class, 3),
             new AbstractMap.SimpleEntry<>(Token.Equal.class, 2),
             new AbstractMap.SimpleEntry<>(Token.NotEqual.class, 2),
             new AbstractMap.SimpleEntry<>(Token.Ampersand.class, 1),
@@ -34,10 +29,6 @@ public class TypeParser {
             new AbstractMap.SimpleEntry<>(Token.Minus.class, Associativity.LEFT),
             new AbstractMap.SimpleEntry<>(Token.Asterisk.class, Associativity.LEFT),
             new AbstractMap.SimpleEntry<>(Token.Slash.class, Associativity.LEFT),
-            new AbstractMap.SimpleEntry<>(Token.GreaterThan.class, Associativity.LEFT),
-            new AbstractMap.SimpleEntry<>(Token.GreaterThanOrEqual.class, Associativity.LEFT),
-            new AbstractMap.SimpleEntry<>(Token.LessThan.class, Associativity.LEFT),
-            new AbstractMap.SimpleEntry<>(Token.LessThanOrEqual.class, Associativity.LEFT),
             new AbstractMap.SimpleEntry<>(Token.Equal.class, Associativity.LEFT),
             new AbstractMap.SimpleEntry<>(Token.NotEqual.class, Associativity.LEFT),
             new AbstractMap.SimpleEntry<>(Token.Keyword.class, Associativity.LEFT),

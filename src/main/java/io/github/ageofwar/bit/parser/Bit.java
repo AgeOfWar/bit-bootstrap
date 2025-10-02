@@ -30,7 +30,7 @@ public sealed interface Bit {
 
         record Variable(String name, Expression value, TypeExpression type) implements Declaration {}
         record Value(String name, Expression value, TypeExpression type) implements Declaration {}
-        record Function(String name, List<Parameter> parameters, Expression body, TypeExpression returnType) implements Declaration {
+        record Function(String name, List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, TypeExpression returnType) implements Declaration {
             public record Parameter(String name, TypeExpression type) {}
         }
         record Type(String name, List<TypeParameter> parameters, TypeExpression value) implements Declaration {
@@ -53,7 +53,7 @@ public sealed interface Bit {
 
     sealed interface Expression extends Bit {
         record Identifier(String name) implements Expression {}
-        record Call(Expression callee, List<Expression> arguments) implements Expression {}
+        record Call(Expression callee, List<Expression> arguments, List<TypeExpression> generics) implements Expression {}
         record Block(List<Bit> statements) implements Expression {}
         record NumberLiteral(String value) implements Expression {}
         record StringLiteral(String value) implements Expression {}
@@ -86,6 +86,8 @@ public sealed interface Bit {
         record Continue() implements Expression {}
         record Return(Expression value) implements Expression {}
     }
+
+    record GenericDeclaration(String name, TypeExpression extendsType) {}
 
     sealed interface TypeExpression extends Bit {
         record Identifier(String name) implements TypeExpression {}

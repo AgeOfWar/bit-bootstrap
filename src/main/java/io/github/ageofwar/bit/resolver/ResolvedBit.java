@@ -13,7 +13,7 @@ public sealed interface ResolvedBit {
 
         record Variable(Symbol name, Expression value, io.github.ageofwar.bit.types.Type type) implements Declaration {}
         record Value(Symbol name, Expression value, io.github.ageofwar.bit.types.Type type) implements Declaration {}
-        record Function(Symbol name, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) implements Declaration {
+        record Function(Symbol name, List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) implements Declaration {
             public record Parameter(Symbol name, io.github.ageofwar.bit.types.Type type) {}
         }
         record Type(Symbol name, Symbol valueName, List<TypeParameter> parameters, io.github.ageofwar.bit.types.Type value) implements Declaration {
@@ -44,7 +44,7 @@ public sealed interface ResolvedBit {
         Type returnType();
 
         record Identifier(Symbol name, Type type, Type returnType) implements Expression {}
-        record Call(Expression callee, List<Expression> arguments, Type type, Type returnType) implements Expression {}
+        record Call(Expression callee, List<Expression> arguments, List<Type> generics, Type type, Type returnType) implements Expression {}
         record Block(List<ResolvedBit> statements, Type type, Type returnType) implements Expression {}
         record NumberLiteral(String value, Type type, Type returnType) implements Expression {}
         record StringLiteral(String value, Type type, Type returnType) implements Expression {}
@@ -78,6 +78,8 @@ public sealed interface ResolvedBit {
         record Continue(Type type, Type returnType) implements Expression {}
         record Return(Expression value, Type type, Type returnType) implements Expression {}
     }
+
+    record GenericDeclaration(Symbol name, Type extendsType, Type type) {}
 
     final class Symbol {
         private final String name;
