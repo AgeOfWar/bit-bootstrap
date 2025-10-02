@@ -77,7 +77,7 @@ public sealed interface Bit {
         record Is(Expression expression, TypeExpression type) implements Expression {}
         record Access(Expression expression, String field) implements Expression {}
         record Struct(Map<String, Expression> fields) implements Expression {}
-        record Function(List<Function.Parameter> parameters, Expression body, TypeExpression returnType) implements Expression {
+        record Function(List<GenericDeclaration> generics, List<Function.Parameter> parameters, Expression body, TypeExpression returnType) implements Expression {
             public record Parameter(String name, TypeExpression type) {}
         }
         record Instantiation(String className, List<Expression> arguments) implements Expression {}

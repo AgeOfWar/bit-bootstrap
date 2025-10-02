@@ -30,7 +30,7 @@ public sealed interface ResolvedBit {
             }
         }
         record Implementation(Symbol name, io.github.ageofwar.bit.types.Type receiver, List<Function> extensions) implements Declaration {
-            public record Function(Symbol name, Symbol thisSymbol, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) {
+            public record Function(Symbol name, Symbol thisSymbol, List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) {
                 public record Parameter(Symbol name, io.github.ageofwar.bit.types.Type type) {}
             }
         }
@@ -69,7 +69,7 @@ public sealed interface ResolvedBit {
         record Access(Expression expression, String field, Type type, Type returnType) implements Expression {}
         record AccessExtension(Expression expression, Symbol name, Type type, Type returnType) implements Expression {}
         record Struct(Map<String, Expression> fields, Type type, Type returnType) implements Expression {}
-        record Function(List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
+        record Function(List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
             public record Parameter(Symbol name, Type type) {}
         }
         record Instantiation(Symbol className, List<Expression> arguments, Type type, Type returnType) implements Expression {}

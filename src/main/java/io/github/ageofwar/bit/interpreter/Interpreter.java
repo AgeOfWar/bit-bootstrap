@@ -127,8 +127,12 @@ public class Interpreter {
         for (var function : implementation.extensions()) {
             environment.assignVariable(function.name(), (Function<List<Object>, Object>) args -> {
                 environment.assignVariable(function.thisSymbol(), args.getFirst());
-                for (var i = 1; i < function.parameters().size(); i++) {
-                    environment.assignVariable(function.parameters().get(i - 1).name(), args.get(i));
+                for (var i = 0; i < function.generics().size(); i++) {
+                    environment.assignVariable(function.generics().get(i).name(), args.get(i + 1));
+                }
+                var offset = function.generics().size() + 1;
+                for (var i = 0; i < function.parameters().size(); i++) {
+                    environment.assignVariable(function.parameters().get(i).name(), args.get(offset + i));
                 }
                 var result = eval(function.body(), environment);
                 if (result instanceof Return(var value)) {
@@ -360,8 +364,12 @@ public class Interpreter {
 
     private Object eval(ResolvedBit.Expression.Function function, Environment environment) {
         return (Function<List<Object>, Object>) args -> {
+            for (var i = 0; i < function.generics().size(); i++) {
+                environment.assignVariable(function.generics().get(i).name(), args.get(i));
+            }
+            var offset = function.generics().size();
             for (var i = 0; i < function.parameters().size(); i++) {
-                environment.assignVariable(function.parameters().get(i).name(), args.get(i));
+                environment.assignVariable(function.parameters().get(i).name(), args.get(offset + i));
             }
             var result = eval(function.body(), environment);
             if (result instanceof Return(var value)) {

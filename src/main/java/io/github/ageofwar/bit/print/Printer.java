@@ -294,6 +294,9 @@ public class Printer {
     
     private String printFunction(Bit.Expression.Function function) {
         var sb = new StringBuilder();
+        if (!function.generics().isEmpty()) {
+            sb.append("<").append(String.join(", ", function.generics().stream().map(g -> g.name() + (g.extendsType() instanceof Bit.TypeExpression.Identifier(String name) && name.equals("Any") ? "" : ": " + printTypeExpression(g.extendsType()))).toList())).append("> ");
+        }
         sb.append("(");
         for (int i = 0; i < function.parameters().size(); i++) {
             var param = function.parameters().get(i);

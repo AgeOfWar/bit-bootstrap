@@ -415,6 +415,7 @@ public class Parser {
             case Token.LeftParenthesis token -> peek[1] instanceof Token.RightParenthesis || peek[2] instanceof Token.Colon ? nextFunction() : nextGroupExpression();
             case Token.LeftBracket token ->  nextStruct();
             case Token.LeftBrace token -> nextBlock();
+            case Token.LessThan token -> nextFunction();
             default -> throw error("Expected expression, but got: " + tokens.peek());
         };
     }
@@ -533,6 +534,29 @@ public class Parser {
     }
 
     private Bit.Expression.Function nextFunction() {
+        List<Bit.Declaration.GenericDeclaration> generics = null;
+        if (matches(tokens, Token.LessThan.class)) {
+            generics = new ArrayList<>();
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericName = expect(tokens, Token.Identifier.class);
+                Bit.TypeExpression genericType = new Bit.TypeExpression.Identifier("Any");
+                if (matches(tokens, Token.Colon.class)) {
+                    tokens.next();
+                    genericType = typeParser.nextExpression();
+                }
+                generics.add(new Bit.Declaration.GenericDeclaration(genericName.name(), genericType));
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
+
         expect(tokens, Token.LeftParenthesis.class);
         var parameters = new ArrayList<Bit.Expression.Function.Parameter>();
         while (!(tokens.peek() instanceof Token.RightParenthesis)) {
@@ -554,7 +578,7 @@ public class Parser {
         }
         expect(tokens, Token.Arrow.class);
         var body = nextExpression();
-        return new Bit.Expression.Function(parameters, body, returnType);
+        return new Bit.Expression.Function(generics, parameters, body, returnType);
     }
 
     private Bit.Expression.Break nextBreak() {

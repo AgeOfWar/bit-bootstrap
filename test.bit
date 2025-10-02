@@ -1,11 +1,13 @@
 type Box(T) = [ value: T ]
 
-fun sumBox<T: Integer>(a: Box(T), b: T): Box(T) {
-    return [ value: a.value + b as T ]
+impl String {
+    fun sumBox<T: Integer>(a: Box(T), b: T): Box(T) {
+        return [ value: a.value + b as T ]
+    }
 }
 
 fun main() {
     x = [ value: 32 ]
-    y = sumBox<Integer>(x, 10)
+    y = "".sumBox<Integer>(x, 10)
     print(y)
 }
