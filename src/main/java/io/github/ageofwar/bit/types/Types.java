@@ -175,6 +175,43 @@ public class Types {
         };
     }
 
+    public static Map<Type.TypeVariable, Type> unify(List<Type> partialTypes, List<Type> actualTypes) {
+        var mapping = new HashMap<Type.TypeVariable, Type>();
+        unify(partialTypes, actualTypes, mapping);
+        return mapping;
+    }
+
+    private static void unify(List<Type> partialTypes, List<Type> actualTypes, Map<Type.TypeVariable, Type> mapping) {
+        for (var i = 0; i < partialTypes.size(); i++) {
+            unify(partialTypes.get(i), actualTypes.get(i), mapping);
+        }
+    }
+
+    private static void unify(Type partialType, Type actualType, Map<Type.TypeVariable, Type> mapping) {
+        if (partialType instanceof Type.TypeVariable typeVariable) {
+            var mappedType = mapping.get(typeVariable);
+            if (mappedType == null) {
+                mapping.put(typeVariable, actualType);
+            } else {
+                mapping.put(typeVariable, unifyCovariant(mappedType, actualType));
+            }
+        }
+
+        switch (partialType) { // TODO: handle more complex types
+            case Type.Union(var partialTypes) -> {}
+            case Type.Intersection(var partialTypes) -> {}
+            case Type.Function(var returnType, var generics, var parameters) -> {}
+            case Type.Struct(var fields) -> unify(new ArrayList<>(fields.values()), new ArrayList<>(((Type.Struct) actualType).fields().values()), mapping);
+            default -> {}
+        }
+    }
+
+    private static Type unifyCovariant(Type type1, Type type2) {
+        if (extend(type1, type2)) return type2;
+        if (extend(type2, type1)) return type1;
+        return union(type1, type2);
+    }
+
     private static boolean compatible(Type type, Type other) {
         return switch (type) {
             case Type.Struct struct -> {

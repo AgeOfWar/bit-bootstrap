@@ -349,19 +349,17 @@ public class Resolver {
 
     private ResolvedBit.Expression resolve(Bit.Expression.Call call, ResolverEnvironment environment) {
         var callee = resolve(call.callee(), environment);
-        var generics = call.generics() == null ? List.<Type>of() : call.generics().stream()
-                .map(generic -> resolve(generic, environment))
-                .toList();
         if (!(callee.type() instanceof Type.Function(var returnType, var g, var parameters))) {
             throw new ResolverException("Type '" + callee.type() + "' is not a function type.");
-        }
-        var genericsCount = g.size();
-        if (generics.size() != genericsCount) {
-            throw new ResolverException("Function expected " + genericsCount + " generics but got " + generics.size() + ".");
         }
         var argumentTypes = call.arguments().stream()
                 .map(arg -> resolve(arg, environment))
                 .toList();
+        var generics = resolveCallGenerics(call, (Type.Function) callee.type(), argumentTypes, environment);
+        var genericsCount = g.size();
+        if (generics.size() != genericsCount) {
+            throw new ResolverException("Function expected " + genericsCount + " generics but got " + generics.size() + ".");
+        }
         var completeFunctionType = (Type.Function) complete(callee.type(), generics);
         if (parameters.length != argumentTypes.size()) {
             throw new ResolverException("Function expected " + parameters.length + " arguments but got " + argumentTypes.size() + ".");
@@ -374,6 +372,37 @@ public class Resolver {
             }
         }
         return new ResolvedBit.Expression.Call(callee, argumentTypes, generics, completeFunctionType.returnType(), never());
+    }
+
+    private List<Type> resolveCallGenerics(Bit.Expression.Call call, Type.Function calleeType, List<ResolvedBit.Expression> arguments, ResolverEnvironment environment) {
+        if (calleeType.generics().isEmpty()) {
+            if (call.generics() != null && !call.generics().isEmpty()) {
+                throw new ResolverException("Function does not take generics but got " + call.generics().size() + ".");
+            }
+            return List.of();
+        }
+
+        if (call.generics() != null) {
+            return call.generics().stream()
+                    .map(generic -> resolve(generic, environment))
+                    .toList();
+        }
+
+        var mapping = unify(
+                Arrays.stream(((Type.Function) resolve(call.callee(), environment).type()).parameters()).toList(),
+                arguments.stream()
+                        .map(ResolvedBit.Expression::type)
+                        .toList()
+        );
+        var generics = new ArrayList<Type>();
+        for (var type : calleeType.generics()) {
+            var mapped = mapping.get(type);
+            if (mapped == null) {
+                throw new ResolverException("Could not infer generic type: " + type);
+            }
+            generics.add(mapped);
+        }
+        return generics;
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Block block, ResolverEnvironment environment) {
