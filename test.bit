@@ -1,11 +1,11 @@
-type Box(T) = [ value: T ]
+class Box<T>(public value: T) {
+}
 
-fun sumBox<T: Integer>(a: Box(T), b: T): Box(T) {
-    return [ value: a.value + b as T ]
+fun printBox<T>(box: Box(T)) {
+    print(box.value)
 }
 
 fun main() {
-    x: Box(Integer) = [ value: 32 ]
-    y = sumBox(x, 10)
-    print(y)
+    box = new Box(42)
+    printBox(box)
 }

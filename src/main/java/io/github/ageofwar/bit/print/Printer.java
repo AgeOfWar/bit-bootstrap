@@ -76,7 +76,11 @@ public class Printer {
 
     private String printClassDeclaration(Bit.Declaration.Class classDecl) {
         var sb = new StringBuilder();
-        sb.append("class ").append(classDecl.name()).append("(");
+        sb.append("class ");
+        if (!classDecl.generics().isEmpty()) {
+            sb.append(printGenerics(classDecl.generics()));
+        }
+        sb.append(classDecl.name()).append("(");
         for (int i = 0; i < classDecl.constructor().parameters().size(); i++) {
             var param = classDecl.constructor().parameters().get(i);
             sb.append(param.name()).append(": ").append(printTypeExpression(param.type()));

@@ -36,7 +36,7 @@ public sealed interface Bit {
         record Type(String name, List<TypeParameter> parameters, TypeExpression value) implements Declaration {
             public record TypeParameter(String name, TypeExpression type) {}
         }
-        record Class(String name, Constructor constructor, List<Member> members) implements Declaration {
+        record Class(String name, List<GenericDeclaration> generics, Constructor constructor, List<Member> members) implements Declaration {
             public record Member(Declaration declaration, Visibility visibility) {
                 public enum Visibility {
                     PUBLIC, PRIVATE
@@ -80,7 +80,7 @@ public sealed interface Bit {
         record Function(List<GenericDeclaration> generics, List<Function.Parameter> parameters, Expression body, TypeExpression returnType) implements Expression {
             public record Parameter(String name, TypeExpression type) {}
         }
-        record Instantiation(String className, List<Expression> arguments) implements Expression {}
+        record Instantiation(String className, List<Expression> arguments, List<TypeExpression> generics) implements Expression {}
 
         record Break() implements Expression {}
         record Continue() implements Expression {}

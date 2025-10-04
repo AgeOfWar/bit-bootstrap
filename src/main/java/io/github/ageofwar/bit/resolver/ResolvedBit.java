@@ -19,7 +19,7 @@ public sealed interface ResolvedBit {
         record Type(Symbol name, Symbol valueName, List<TypeParameter> parameters, io.github.ageofwar.bit.types.Type value) implements Declaration {
             public record TypeParameter(io.github.ageofwar.bit.types.Type type) {}
         }
-        record Class(Symbol name, Symbol valueName, Symbol thisSymbol, Constructor constructor, List<Member> members, io.github.ageofwar.bit.types.Type type) implements Declaration {
+        record Class(Symbol name, Symbol valueName, Symbol thisSymbol, List<GenericDeclaration> generics, Constructor constructor, List<Member> members, io.github.ageofwar.bit.types.Type type) implements Declaration {
             public record Member(Declaration declaration, Visibility visibility) {
                 public enum Visibility {
                     PUBLIC, PRIVATE
@@ -72,7 +72,7 @@ public sealed interface ResolvedBit {
         record Function(List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
             public record Parameter(Symbol name, Type type) {}
         }
-        record Instantiation(Symbol className, List<Expression> arguments, Type type, Type returnType) implements Expression {}
+        record Instantiation(Symbol className, List<Expression> arguments, List<Type> generics, Type type, Type returnType) implements Expression {}
 
         record Break(Type type, Type returnType) implements Expression {}
         record Continue(Type type, Type returnType) implements Expression {}

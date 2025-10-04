@@ -227,6 +227,30 @@ public class Parser {
     private Bit.Declaration.Class nextClassDeclaration() {
         expect(tokens, Token.Keyword.Type.CLASS);
         var identifier = expect(tokens, Token.Identifier.class);
+
+        List<Bit.Declaration.GenericDeclaration> typeGenerics = null;
+        if (matches(tokens, Token.LessThan.class)) {
+            typeGenerics = new ArrayList<>();
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericName = expect(tokens, Token.Identifier.class);
+                Bit.TypeExpression genericType = new Bit.TypeExpression.Identifier("Any");
+                if (matches(tokens, Token.Colon.class)) {
+                    tokens.next();
+                    genericType = typeParser.nextExpression();
+                }
+                typeGenerics.add(new Bit.Declaration.GenericDeclaration(genericName.name(), genericType));
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
+
         expect(tokens, Token.LeftParenthesis.class);
         skipNewLines();
         var parameters = new ArrayList<Bit.Declaration.Class.Constructor.Parameter>();
@@ -284,7 +308,7 @@ public class Parser {
             skipNewLines();
         }
         expect(tokens, Token.RightBrace.class);
-        return new Bit.Declaration.Class(identifier.name(), new Bit.Declaration.Class.Constructor(parameters), members);
+        return new Bit.Declaration.Class(identifier.name(), typeGenerics, new Bit.Declaration.Class.Constructor(parameters), members);
     }
 
     private Bit.Declaration.Implementation nextImplementation() {
@@ -423,6 +447,23 @@ public class Parser {
     private Bit.Expression.Instantiation nextInstantiation() {
         expect(tokens, Token.Keyword.Type.NEW);
         var className = expect(tokens, Token.Identifier.class).name();
+        List<Bit.TypeExpression> generics = null;
+        if (matches(tokens, Token.LessThan.class)) {
+            generics = new ArrayList<>();
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericType = typeParser.nextExpression();
+                generics.add(genericType);
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
         expect(tokens, Token.LeftParenthesis.class);
         var arguments = new ArrayList<Bit.Expression>();
         while (!(tokens.peek() instanceof Token.RightParenthesis)) {
@@ -430,7 +471,7 @@ public class Parser {
             if (tokens.peek() instanceof Token.Comma) tokens.next();
         }
         expect(tokens, Token.RightParenthesis.class);
-        return new Bit.Expression.Instantiation(className, arguments);
+        return new Bit.Expression.Instantiation(className, arguments, generics);
     }
 
     private Bit.Expression nextGroupExpression() {

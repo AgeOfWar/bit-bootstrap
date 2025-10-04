@@ -167,10 +167,20 @@ public class Resolver {
 
     private ResolvedBit.Declaration.Class resolve(Bit.Declaration.Class classDeclaration, ResolverEnvironment environment) {
         var membersEnvironment = new ResolverEnvironment(environment);
+
+        var generics = new ArrayList<ResolvedBit.GenericDeclaration>();
+        for (var generic : classDeclaration.generics()) {
+            var bounds = resolve(generic.extendsType(), membersEnvironment);
+            var type = generic(bounds);
+            var symbol = membersEnvironment.declareType(generic.name(), type);
+            type.setSymbol(symbol);
+            generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+        }
+
         var constructorParameters = new ArrayList<ResolvedBit.Declaration.Class.Constructor.Parameter>();
         for (var param : classDeclaration.constructor().parameters()) {
-            var symbol = membersEnvironment.declareValueType(param.name(), resolve(param.type(), environment));
-            constructorParameters.add(new ResolvedBit.Declaration.Class.Constructor.Parameter(symbol, resolve(param.type(), environment)));
+            var symbol = membersEnvironment.declareValueType(param.name(), resolve(param.type(), membersEnvironment));
+            constructorParameters.add(new ResolvedBit.Declaration.Class.Constructor.Parameter(symbol, resolve(param.type(), membersEnvironment)));
         }
 
         var constructor = new ResolvedBit.Declaration.Class.Constructor(constructorParameters);
@@ -205,9 +215,12 @@ public class Resolver {
                 .map(ResolvedBit.Declaration.Class.Constructor.Parameter::type)
                 .toArray(Type[]::new);
 
-        var valueSymbol = environment.declareType(classDeclaration.name(), returnType);
-        var symbol = environment.declareConstructor(classDeclaration.name(), function(returnType, parameterTypes));
-        return new ResolvedBit.Declaration.Class(symbol, valueSymbol, thisSymbol, constructor, resolvedMembers, returnType);
+        var valueSymbol = generics.isEmpty() ? environment.declareType(classDeclaration.name(), returnType) : environment.declareFunctionType(classDeclaration.name(), new TypeFunction(args -> {
+            var t = complete(function(returnType, generics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameterTypes), Arrays.stream(args).toList());
+            return ((Type.Function) t).returnType();
+        }));
+        var symbol = environment.declareConstructor(classDeclaration.name(), function(returnType, generics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameterTypes));
+        return new ResolvedBit.Declaration.Class(symbol, valueSymbol, thisSymbol, generics, constructor, resolvedMembers, returnType);
     }
 
     private ResolvedBit.Declaration.Implementation resolve(Bit.Declaration.Implementation implementation, ResolverEnvironment environment) {
@@ -355,7 +368,7 @@ public class Resolver {
         var argumentTypes = call.arguments().stream()
                 .map(arg -> resolve(arg, environment))
                 .toList();
-        var generics = resolveCallGenerics(call, (Type.Function) callee.type(), argumentTypes, environment);
+        var generics = resolveCallGenerics(call.generics(), (Type.Function) callee.type(), argumentTypes, environment);
         var genericsCount = g.size();
         if (generics.size() != genericsCount) {
             throw new ResolverException("Function expected " + genericsCount + " generics but got " + generics.size() + ".");
@@ -374,35 +387,35 @@ public class Resolver {
         return new ResolvedBit.Expression.Call(callee, argumentTypes, generics, completeFunctionType.returnType(), never());
     }
 
-    private List<Type> resolveCallGenerics(Bit.Expression.Call call, Type.Function calleeType, List<ResolvedBit.Expression> arguments, ResolverEnvironment environment) {
+    private List<Type> resolveCallGenerics(List<Bit.TypeExpression> generics, Type.Function calleeType, List<ResolvedBit.Expression> arguments, ResolverEnvironment environment) {
         if (calleeType.generics().isEmpty()) {
-            if (call.generics() != null && !call.generics().isEmpty()) {
-                throw new ResolverException("Function does not take generics but got " + call.generics().size() + ".");
+            if (generics != null && !generics.isEmpty()) {
+                throw new ResolverException("Function does not take generics but got " + generics.size() + ".");
             }
             return List.of();
         }
 
-        if (call.generics() != null) {
-            return call.generics().stream()
+        if (generics != null) {
+            return generics.stream()
                     .map(generic -> resolve(generic, environment))
                     .toList();
         }
 
         var mapping = unify(
-                Arrays.stream(((Type.Function) resolve(call.callee(), environment).type()).parameters()).toList(),
+                Arrays.stream(calleeType.parameters()).toList(),
                 arguments.stream()
                         .map(ResolvedBit.Expression::type)
                         .toList()
         );
-        var generics = new ArrayList<Type>();
+        var resolvedGenerics = new ArrayList<Type>();
         for (var type : calleeType.generics()) {
             var mapped = mapping.get(type);
             if (mapped == null) {
                 throw new ResolverException("Could not infer generic type: " + type);
             }
-            generics.add(mapped);
+            resolvedGenerics.add(mapped);
         }
-        return generics;
+        return resolvedGenerics;
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Block block, ResolverEnvironment environment) {
@@ -682,24 +695,30 @@ public class Resolver {
         if (entry == null) {
             throw new ResolverException("Constructor '" + instantiation.className() + "' is not defined in the current scope.");
         }
-        if (!(entry.type() instanceof Type.Function(var returnType, var generics, var parameters))) {
+        if (!(entry.type() instanceof Type.Function(var returnType, var g, var parameters))) {
             throw new ResolverException("Type '" + entry.type() + "' is not a function type.");
         }
         var argumentTypes = instantiation.arguments().stream()
                 .map(arg -> resolve(arg, environment))
                 .toList();
+        var generics = resolveCallGenerics(instantiation.generics(), (Type.Function) entry.type(), argumentTypes, environment);
+        var genericsCount = g.size();
+        if (generics.size() != genericsCount) {
+            throw new ResolverException("Function expected " + genericsCount + " generics but got " + generics.size() + ".");
+        }
+        var completeFunctionType = (Type.Function) complete(entry.type(), generics);
         if (parameters.length != argumentTypes.size()) {
             throw new ResolverException("Constructor expected " + parameters.length + " arguments but got " + argumentTypes.size() + ".");
         }
         for (int i = 0; i < parameters.length; i++) {
-            var expectedType = parameters[i];
+            var expectedType = completeFunctionType.parameters()[i];
             var actualType = argumentTypes.get(i).type();
             if (!extend(actualType, expectedType)) {
                 throw new ResolverException("Argument " + (i + 1) + " type mismatch: expected " + expectedType + " but got " + actualType);
             }
         }
         var returnTypes = argumentTypes.stream().map(ResolvedBit.Expression::returnType).toArray(Type[]::new);
-        return new ResolvedBit.Expression.Instantiation(entry.symbol(), argumentTypes, returnType, union(returnTypes));
+        return new ResolvedBit.Expression.Instantiation(entry.symbol(), argumentTypes, generics, completeFunctionType.returnType(), union(returnTypes));
     }
 
     // type expressions

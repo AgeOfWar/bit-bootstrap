@@ -120,10 +120,10 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareFunctionType(String name, TypeFunction type) {
-        var value = new ResolvedBit.Symbol(name, otherCount);
-        functionTypes.declare(name, new ValueTypeFunction(value, type));
+        var symbol = declareValueType(name, null);
+        functionTypes.declare(name, new ValueTypeFunction(symbol, type));
         incrementOtherCount();
-        return value;
+        return symbol;
     }
 
     public ValueTypeFunction getFunctionType(String name) {
