@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -293,13 +294,13 @@ public class Interpreter {
     private Object eval(ResolvedBit.Expression.Equal equal, Environment environment) {
         var lhs = eval(equal.lhs(), environment);
         var rhs = eval(equal.rhs(), environment);
-        return lhs.equals(rhs);
+        return Objects.equals(lhs, rhs);
     }
 
     private Object eval(ResolvedBit.Expression.NotEqual equal, Environment environment) {
         var lhs = eval(equal.lhs(), environment);
         var rhs = eval(equal.rhs(), environment);
-        return !lhs.equals(rhs);
+        return !Objects.equals(lhs, rhs);
     }
 
     private Object eval(ResolvedBit.Expression.Struct struct, Environment environment) {

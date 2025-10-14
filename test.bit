@@ -6,6 +6,6 @@ fun main() {
     while (true) {
         c = file.read()
         if (c == "") break
-        print(c)
+        println(c)
     }
 }

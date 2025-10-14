@@ -5,6 +5,7 @@ import io.github.ageofwar.bit.resolver.ResolvedBit;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.function.Function;
 
@@ -38,7 +39,7 @@ public class Environment {
         });
         environment.assignVariable(new ResolvedBit.Symbol("__file_open_write", i++), (Function<List<Object>, Object>) args -> {
             try {
-                return Files.newBufferedWriter(Paths.get((String) args.getFirst()));
+                return Files.newBufferedWriter(Paths.get((String) args.getFirst()), StandardOpenOption.CREATE);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

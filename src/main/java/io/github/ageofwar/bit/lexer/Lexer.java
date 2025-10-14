@@ -118,6 +118,7 @@ public class Lexer implements TokenStream {
                 throw new LexerException("Unterminated string literal");
             }
             if (code == '\\') {
+                reader.next();
                 code = reader.next();
                 switch (code) {
                     case 'n' -> builder.append('\n');
