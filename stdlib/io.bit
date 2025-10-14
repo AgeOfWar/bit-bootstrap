@@ -1,0 +1,28 @@
+type Reader = [
+    fun read(): String
+]
+
+type Writer = [
+    fun write(String): None
+]
+
+stdin = [
+    read: __read_stdin
+]
+
+stdout = [
+    write: __write_stdout
+]
+
+class FileReader(path: String) {
+    handle: Any = __file_open_read(path)
+
+    fun read(): String {
+        c = __file_read(this.handle)
+        if (c == "") {
+            __file_close(this.handle)
+        }
+        c
+    }
+}
+

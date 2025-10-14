@@ -84,14 +84,12 @@ public class Interpreter {
     }
 
     private void interpret(ResolvedBit.Declaration.Type type, Environment environment) {
-        if (type.value() != null) {
-            environment.assignVariable(type.name(), type.value());
+        if (type.valueName() != null) {
+            environment.assignVariable(type.valueName(), type.value());
         }
     }
 
     public void interpret(ResolvedBit.Declaration.Class classDeclaration, Environment environment) {
-        environment.assignVariable(classDeclaration.valueName(), classDeclaration.type());
-
         var constructor = (Function<List<Object>, Object>) args -> {
             for (var i = 0; i < classDeclaration.constructor().parameters().size(); i++) {
                 environment.assignVariable(classDeclaration.constructor().parameters().get(i).name(), args.get(i));
@@ -321,7 +319,7 @@ public class Interpreter {
 
     private Object eval(ResolvedBit.Expression.Is isExpression, Environment environment) {
         var value = eval(isExpression.expression(), environment);
-        var type = isExpression.type();
+        var type = isExpression.checkType();
         return isAssignable(value, type, environment);
     }
 

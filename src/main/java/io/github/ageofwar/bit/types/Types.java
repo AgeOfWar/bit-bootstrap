@@ -1,7 +1,5 @@
 package io.github.ageofwar.bit.types;
 
-import io.github.ageofwar.bit.resolver.ResolvedBit;
-
 import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Stream;
@@ -285,10 +283,12 @@ public class Types {
     }
 
     private static boolean extend(Type.Integer type, Type other) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
         return other == INTEGER;
     }
 
     private static boolean extend(Type.String type, Type other) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
         return other == STRING;
     }
 
@@ -307,6 +307,7 @@ public class Types {
     }
 
     private static boolean extend(Type.Function function, Type other) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(function, t));
         if (!(other instanceof Type.Function(var returnType, var generics, var parameters))) return false;
         if (!extend(function.returnType(), returnType)) return false;
         for (var i = 0;  i < parameters.length; i++) {
@@ -316,6 +317,7 @@ public class Types {
     }
 
     private static boolean extend(Type.Struct type, Type other) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
         if (!(other instanceof Type.Struct(var fields))) return false;
         for (var entry : fields.entrySet()) {
             if (!extend(type.fields().get(entry.getKey()), entry.getValue())) return false;
@@ -472,8 +474,6 @@ public class Types {
     }
 
     public static Type equal(Type left, Type right) {
-        if (!extend(left, integer())) throw new IllegalArgumentException("Left operand must be an integer type");
-        if (!extend(right, integer())) throw new IllegalArgumentException("Right operand must be an integer type");
         if (left instanceof Type.NumberLiteral(var value1) && right instanceof Type.NumberLiteral(var value2)) {
             return value1.equals(value2) ? _true() : _false();
         }
@@ -487,8 +487,6 @@ public class Types {
     }
 
     public static Type notEqual(Type left, Type right) {
-        if (!extend(left, integer())) throw new IllegalArgumentException("Left operand must be an integer type");
-        if (!extend(right, integer())) throw new IllegalArgumentException("Right operand must be an integer type");
         if (left instanceof Type.NumberLiteral(var value1) && right instanceof Type.NumberLiteral(var value2)) {
             return !value1.equals(value2) ? _true() : _false();
         }

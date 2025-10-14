@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static io.github.ageofwar.bit.parser.Parsers.expect;
+import static io.github.ageofwar.bit.parser.Parsers.matches;
 
 public class TypeParser {
     private static final Map<Class<? extends Token>, Integer> OPERATOR_PRECEDENCES = Map.ofEntries(
@@ -52,10 +53,10 @@ public class TypeParser {
         expect(tokens, Token.Keyword.Type.TYPE);
         var identifier = expect(tokens, Token.Identifier.class);
         var parameters = new ArrayList<Bit.Declaration.Type.TypeParameter>();
-        if (tokens.peek() instanceof Token.LeftParenthesis) {
-            expect(tokens, Token.LeftParenthesis.class);
+        if (tokens.peek() instanceof Token.LessThan) {
+            expect(tokens, Token.LessThan.class);
             skipNewLines();
-            while (!(tokens.peek() instanceof Token.RightParenthesis)) {
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
                 var paramIdentifier = expect(tokens, Token.Identifier.class);
                 if (tokens.peek() instanceof Token.Colon) {
                     expect(tokens, Token.Colon.class);
@@ -70,7 +71,7 @@ public class TypeParser {
                     skipNewLines();
                 }
             }
-            expect(tokens, Token.RightParenthesis.class);
+            expect(tokens, Token.GreaterThan.class);
         }
         var peek = tokens.peek();
         if (!(peek instanceof Token.Assign)) {
@@ -147,10 +148,30 @@ public class TypeParser {
         skipNewLines();
         var fields = new HashMap<String, Bit.TypeExpression>();
         while (!(tokens.peek() instanceof Token.RightBracket)) {
-            var identifier = nextIdentifier();
-            expect(tokens, Token.Colon.class);
-            var typeExpression = nextExpression();
-            fields.put(identifier.name(), typeExpression);
+            if (matches(tokens, Token.Keyword.Type.FUNCTION)) {
+                tokens.next();
+                var name = expect(tokens, Token.Identifier.class);
+                expect(tokens, Token.LeftParenthesis.class);
+                var parameters = new ArrayList<Bit.TypeExpression>();
+                skipNewLines();
+                while (!(tokens.peek() instanceof Token.RightParenthesis)) {
+                    parameters.add(nextExpression());
+                    skipNewLines();
+                    if (tokens.peek() instanceof Token.Comma) {
+                        tokens.next();
+                        skipNewLines();
+                    }
+                }
+                expect(tokens, Token.RightParenthesis.class);
+                expect(tokens, Token.Colon.class);
+                var returnType = nextExpression();
+                fields.put(name.name(), new Bit.TypeExpression.Function(parameters, returnType));
+            } else {
+                var identifier = nextIdentifier();
+                expect(tokens, Token.Colon.class);
+                var typeExpression = nextExpression();
+                fields.put(identifier.name(), typeExpression);
+            }
             skipNewLines();
             if (tokens.peek() instanceof Token.Comma) {
                 tokens.next();

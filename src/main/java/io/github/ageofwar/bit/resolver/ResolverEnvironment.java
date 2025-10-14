@@ -5,6 +5,7 @@ import io.github.ageofwar.bit.types.TypeFunction;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.github.ageofwar.bit.types.Types.*;
 import static io.github.ageofwar.bit.types.Types._boolean;
@@ -15,25 +16,35 @@ import static io.github.ageofwar.bit.types.Types.none;
 import static io.github.ageofwar.bit.types.Types.string;
 
 public class ResolverEnvironment {
-    private ResolverEnvironment parent;
-    private ScopedTable<VariableType> valueTypes;
-    private ScopedTable<ValueType> types;
-    private ScopedTable<ValueTypeFunction> functionTypes;
-    private ScopedTable<ValueType> constructors;
-    private ScopedTable<List<ExtensionType>> extensionTypes;
+    private final ResolverEnvironment parent;
+    private final ScopedTable<VariableType> valueTypes;
+    private final ScopedTable<ValueType> types;
+    private final ScopedTable<ValueTypeFunction> functionTypes;
+    private final ScopedTable<ValueType> constructors;
+    private final ScopedTable<List<ExtensionType>> extensionTypes;
 
-    int variablesCount;
-    int otherCount;
+    private AtomicInteger variablesCount;
+    private int typesCount;
 
     public static ResolverEnvironment init() {
         var environment = new ResolverEnvironment(null);
-        environment.declareValueType("print", function(none(), any()));
+        environment.declareValueType("__read_stdin", function(string()));
+        environment.declareValueType("__write_stdout", function(none(), string()));
+        environment.declareValueType("__file_open_read", function(any(), string()));
+        environment.declareValueType("__file_open_write", function(any(), string()));
+        environment.declareValueType("__file_close", function(none(), any()));
+        environment.declareValueType("__file_read", function(string(), any()));
+        environment.declareValueType("__file_write", function(none(), any(), string()));
+
+        environment.declareExtensionType("toString", integer(), function(string()));
+
         environment.declareType("Any", any());
         environment.declareType("Never", never());
         environment.declareType("Integer", integer());
         environment.declareType("Boolean", _boolean());
         environment.declareType("String", string());
         environment.declareType("None", none());
+
         return environment;
     }
 
@@ -44,32 +55,24 @@ public class ResolverEnvironment {
         this.functionTypes = new ScopedTable<>(parent != null ? parent.functionTypes : null);
         this.extensionTypes = new ScopedTable<>(parent != null ? parent.extensionTypes : null);
         this.constructors = new ScopedTable<>(parent != null ? parent.constructors : null);
-        variablesCount = parent != null ? parent.variablesCount : 0;
-        otherCount = parent != null ? parent.otherCount : 0;
+        variablesCount = parent != null ? parent.variablesCount : new AtomicInteger();
+        typesCount = parent != null ? parent.typesCount : 0;
     }
 
     public int variables() {
-        return variablesCount;
+        return variablesCount.get();
     }
 
-    private void incrementVariablesCount() {
+    public void incrementTypesCount() {
         if (parent != null) {
-            parent.incrementVariablesCount();
+            parent.incrementTypesCount();
         }
-        variablesCount++;
-    }
-
-    private void incrementOtherCount() {
-        if (parent != null) {
-            parent.incrementOtherCount();
-        }
-        otherCount++;
+        typesCount++;
     }
 
     public ResolvedBit.Symbol declareVariableType(String name, Type type) {
-        var symbol = new ResolvedBit.Symbol(name, variablesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         valueTypes.declare(name, new VariableType(symbol, type, true));
-        incrementVariablesCount();
         return symbol;
     }
 
@@ -90,9 +93,8 @@ public class ResolverEnvironment {
             throw new RuntimeException("Variable with same name already declared: " + name);
         }
 
-        var symbol = new ResolvedBit.Symbol(name, variablesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         valueTypes.declare(name, new VariableType(symbol, type, false));
-        incrementVariablesCount();
         return symbol;
     }
 
@@ -105,9 +107,14 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareType(String name, Type type) {
-        var symbol = declareValueType(name, type);
+        var alreadyDeclared = types.resolve(name);
+        if (alreadyDeclared != null) {
+            throw new RuntimeException("Type already declared: " + name);
+        }
+
+        var symbol = new ResolvedBit.Symbol(name, typesCount);
         types.declare(name, new ValueType(symbol, type));
-        incrementOtherCount();
+        incrementTypesCount();
         return symbol;
     }
 
@@ -120,9 +127,14 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareFunctionType(String name, TypeFunction type) {
-        var symbol = declareValueType(name, null);
+        var alreadyDeclared = functionTypes.resolve(name);
+        if (alreadyDeclared != null) {
+            throw new RuntimeException("Function type already declared: " + name);
+        }
+
+        var symbol = new ResolvedBit.Symbol(name, typesCount);
         functionTypes.declare(name, new ValueTypeFunction(symbol, type));
-        incrementOtherCount();
+        incrementTypesCount();
         return symbol;
     }
 
@@ -135,9 +147,8 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareConstructor(String name, Type type) {
-        var symbol = new ResolvedBit.Symbol(name, variablesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         constructors.declare(name, new ValueType(symbol, type));
-        incrementVariablesCount();
         return symbol;
     }
 
@@ -150,10 +161,9 @@ public class ResolverEnvironment {
     }
 
     public ResolvedBit.Symbol declareExtensionType(String name, Type receiverType, Type type) {
-        var symbol = new ResolvedBit.Symbol(name, variablesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         var candidates = extensionTypes.getSymbols().computeIfAbsent(name, k -> new ArrayList<>());
         candidates.add(new ExtensionType(symbol, receiverType, type));
-        incrementVariablesCount();
         return symbol;
     }
 
@@ -167,16 +177,32 @@ public class ResolverEnvironment {
         valueTypes.declare(oldSymbol.name(), new VariableType(existingType.symbol, newType, false));
     }
 
-    public ResolverEnvironment cloneWithParent(ResolverEnvironment environment) {
-        var env = new ResolverEnvironment(environment);
-        env.valueTypes = valueTypes;
-        env.types = types;
-        env.functionTypes = functionTypes;
-        env.constructors = constructors;
-        env.extensionTypes = extensionTypes;
-        env.variablesCount = variablesCount;
-        env.otherCount = otherCount;
-        return env;
+    public void mergeFrom(ResolverEnvironment other) {
+        for (var valueType : other.valueTypes.getSymbols().entrySet()) {
+            var existing = this.valueTypes.getSymbols().get(valueType.getKey());
+            if (existing != null) throw new RuntimeException("Duplicate value type: " + valueType.getKey());
+            valueTypes.declare(valueType.getKey(), valueType.getValue());
+        }
+        for (var type : other.types.getSymbols().entrySet()) {
+            var existing = this.types.getSymbols().get(type.getKey());
+            if (existing != null) throw new RuntimeException("Duplicate type: " + type.getKey());
+            types.declare(type.getKey(), type.getValue());
+        }
+        for (var functionType : other.functionTypes.getSymbols().entrySet()) {
+            var existing = this.functionTypes.getSymbols().get(functionType.getKey());
+            if (existing != null) throw new RuntimeException("Duplicate function type: " + functionType.getKey());
+            functionTypes.declare(functionType.getKey(), functionType.getValue());
+        }
+        for (var constructor : other.constructors.getSymbols().entrySet()) {
+            var existing = this.constructors.getSymbols().get(constructor.getKey());
+            if (existing != null) throw new RuntimeException("Duplicate constructor: " + constructor.getKey());
+            constructors.declare(constructor.getKey(), constructor.getValue());
+        }
+        for (var extensionType : other.extensionTypes.getSymbols().entrySet()) {
+            var existing = this.extensionTypes.getSymbols().get(extensionType.getKey());
+            if (existing != null) throw new RuntimeException("Duplicate extension function: " + extensionType.getKey());
+            extensionTypes.declare(extensionType.getKey(), extensionType.getValue());
+        }
     }
 
     public record ValueTypeFunction(ResolvedBit.Symbol symbol, TypeFunction type) {

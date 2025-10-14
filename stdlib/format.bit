@@ -1,0 +1,40 @@
+from io import stdout
+
+type Formatter<T> = [
+    fun format(T): String
+]
+
+type Formattable = Boolean | String | Integer | [ fun toString(): String ]
+
+impl Boolean {
+    fun toString(): String {
+        if (this) "true" else "false"
+    }
+}
+
+class StandardFormatter() {
+    fun format(value: Formattable): String {
+        if (value is String) {
+            return value
+        } else if (value is Integer) {
+            return value.toString()
+        } else if (value is Boolean) {
+            return value.toString()
+        } else if (value is [ fun toString(): String ]) {
+            return value.toString()
+        }
+        "<unknown>"
+    }
+}
+
+formatter = new StandardFormatter()
+
+fun print(value: Formattable) {
+    formatted = formatter.format(value)
+    stdout.write(formatted)
+}
+
+fun println(value: Formattable) {
+    print(value)
+    stdout.write("\n")
+}

@@ -41,16 +41,15 @@ public class Resolver {
                 var importEnv = new ResolverEnvironment(environment);
                 resolvedProgram = resolve(importedBitProgram, importEnv, importDecl.identifiers(), alreadyImported);
                 alreadyImported.put(key, resolvedProgram);
+                declarations.addAll(resolvedProgram.declarations());
             } else if (resolvedProgram == null) {
                 throw new ResolverException("Cyclic import detected for package: " + key);
             }
 
-            declarations.addAll(resolvedProgram.declarations());
-            mergedEnvironment = resolvedProgram.environment().cloneWithParent(mergedEnvironment);
+            mergedEnvironment.mergeFrom(resolvedProgram.environment());
         }
 
         var publicEnvironment = new ResolverEnvironment(mergedEnvironment);
-
         for (var declaration : program.declarations()) {
             var resolved = resolve(
                     declaration,
@@ -169,12 +168,14 @@ public class Resolver {
         var membersEnvironment = new ResolverEnvironment(environment);
 
         var generics = new ArrayList<ResolvedBit.GenericDeclaration>();
-        for (var generic : classDeclaration.generics()) {
-            var bounds = resolve(generic.extendsType(), membersEnvironment);
-            var type = generic(bounds);
-            var symbol = membersEnvironment.declareType(generic.name(), type);
-            type.setSymbol(symbol);
-            generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+        if (classDeclaration.generics() != null) {
+            for (var generic : classDeclaration.generics()) {
+                var bounds = resolve(generic.extendsType(), membersEnvironment);
+                var type = generic(bounds);
+                var symbol = membersEnvironment.declareType(generic.name(), type);
+                type.setSymbol(symbol);
+                generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+            }
         }
 
         var constructorParameters = new ArrayList<ResolvedBit.Declaration.Class.Constructor.Parameter>();
@@ -279,8 +280,7 @@ public class Resolver {
             } else {
                 var resolvedType = resolve(declaration.value(), environment);
                 var symbol = environment.declareType(declaration.name(), resolvedType);
-                var valueSymbol = environment.declareValueType(declaration.name(), resolvedType);
-                return new ResolvedBit.Declaration.Type(symbol, valueSymbol, List.of(), resolvedType);
+                return new ResolvedBit.Declaration.Type(symbol, null, List.of(), resolvedType);
             }
         } else {
             if (declaration.value() == null) {
@@ -605,12 +605,12 @@ public class Resolver {
         var expr = resolve(is.expression(), environment);
         var type = resolve(is.type(), environment);
         if (extend(expr.type(), type)) {
-            new ResolvedBit.Expression.Is(expr, _true(), expr.returnType());
+            new ResolvedBit.Expression.Is(expr, type, _true(), expr.returnType());
         }
         if (!extend(type, expr.type())) {
-            new ResolvedBit.Expression.Is(expr, _false(), expr.returnType());
+            new ResolvedBit.Expression.Is(expr, type, _false(), expr.returnType());
         }
-        return new ResolvedBit.Expression.Is(expr, type, expr.returnType());
+        return new ResolvedBit.Expression.Is(expr, type, _boolean(), expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Access access, ResolverEnvironment environment) {
@@ -839,7 +839,7 @@ public class Resolver {
     }
 
     private Stream<Refinement> refine(ResolvedBit.Expression.Is condition, ResolverEnvironment thenEnvironment, ResolverEnvironment elseEnvironment) {
-        return refine(condition.expression(), condition.type(), thenEnvironment, elseEnvironment);
+        return refine(condition.expression(), condition.checkType(), thenEnvironment, elseEnvironment);
     }
 
     private Stream<Refinement> refine(ResolvedBit.Expression.Not condition, ResolverEnvironment thenEnvironment, ResolverEnvironment elseEnvironment) {

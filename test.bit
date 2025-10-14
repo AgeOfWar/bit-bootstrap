@@ -1,11 +1,11 @@
-class Box<T>(public value: T) {
-}
-
-fun printBox<T>(box: Box(T)) {
-    print(box.value)
-}
+from io import *
+from format import *
 
 fun main() {
-    box = new Box(42)
-    printBox(box)
+    file = new FileReader("test.bit")
+    while (true) {
+        c = file.read()
+        if (c == "") break
+        print(c)
+    }
 }

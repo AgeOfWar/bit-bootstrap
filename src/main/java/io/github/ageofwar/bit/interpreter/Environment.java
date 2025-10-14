@@ -2,6 +2,9 @@ package io.github.ageofwar.bit.interpreter;
 
 import io.github.ageofwar.bit.resolver.ResolvedBit;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.function.Function;
 
@@ -12,16 +15,66 @@ public class Environment {
 
     public static Environment init(int variablesSize) {
         var environment = new Environment(variablesSize);
-        environment.assignVariable(new ResolvedBit.Symbol("print", 0), (Function<List<Object>, Object>) args -> {
-            System.out.println(args.getFirst());
+        var i = 0;
+        environment.assignVariable(new ResolvedBit.Symbol("__read_stdin", i++), (Function<List<Object>, Object>) args -> {;
+            try {
+                var c = System.in.read();
+                if (c == -1) return "";
+                return String.valueOf((char) c);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        environment.assignVariable(new ResolvedBit.Symbol("__write_stdout", i++), (Function<List<Object>, Object>) args -> {
+            System.out.print(args.getFirst());
             return none();
         });
-        environment.assignVariable(new ResolvedBit.Symbol("Any", 1), any());
-        environment.assignVariable(new ResolvedBit.Symbol("Never", 2), never());
-        environment.assignVariable(new ResolvedBit.Symbol("Integer", 3), integer());
-        environment.assignVariable(new ResolvedBit.Symbol("Boolean", 4), _boolean());
-        environment.assignVariable(new ResolvedBit.Symbol("String", 5), string());
-        environment.assignVariable(new ResolvedBit.Symbol("None", 6), none());
+        environment.assignVariable(new ResolvedBit.Symbol("__file_open_read", i++), (Function<List<Object>, Object>) args -> {
+            try {
+                return Files.newBufferedReader(Paths.get((String) args.getFirst()));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        environment.assignVariable(new ResolvedBit.Symbol("__file_open_write", i++), (Function<List<Object>, Object>) args -> {
+            try {
+                return Files.newBufferedWriter(Paths.get((String) args.getFirst()));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        environment.assignVariable(new ResolvedBit.Symbol("__file_close", i++), (Function<List<Object>, Object>) args -> {
+            try {
+                ((AutoCloseable) args.getFirst()).close();
+                return none();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        environment.assignVariable(new ResolvedBit.Symbol("__file_read", i++), (Function<List<Object>, Object>) args -> {
+            try {
+                var reader = (java.io.BufferedReader) args.getFirst();
+                int c = reader.read();
+                if (c == -1) return "";
+                return String.valueOf((char) c);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        environment.assignVariable(new ResolvedBit.Symbol("__file_write", i++), (Function<List<Object>, Object>) args -> {
+            try {
+                var writer = (java.io.BufferedWriter) args.getFirst();
+                writer.write((String) args.get(1));
+                writer.flush();
+                return none();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        environment.assignVariable(new ResolvedBit.Symbol("toString", i++), (Function<List<Object>, Object>) args -> {
+            return args.getFirst().toString();
+        });
         return environment;
     }
 

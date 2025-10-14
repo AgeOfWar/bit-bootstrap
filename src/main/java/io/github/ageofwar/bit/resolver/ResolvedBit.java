@@ -65,7 +65,7 @@ public sealed interface ResolvedBit {
         record If(Expression condition, Expression thenBranch, Expression elseBranch, Type type, Type returnType) implements Expression {}
         record While(Expression condition, Expression body, Type type, Type returnType) implements Expression {}
         record As(Expression expression, Type type, Type returnType) implements Expression {}
-        record Is(Expression expression, Type type, Type returnType) implements Expression {}
+        record Is(Expression expression, Type checkType, Type type, Type returnType) implements Expression {}
         record Access(Expression expression, String field, Type type, Type returnType) implements Expression {}
         record AccessExtension(Expression expression, Symbol name, Type type, Type returnType) implements Expression {}
         record Struct(Map<String, Expression> fields, Type type, Type returnType) implements Expression {}
