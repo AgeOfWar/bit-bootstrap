@@ -15,7 +15,6 @@ public class Main {
         try (var reader = Files.newBufferedReader(Paths.get("test.bit"))) {
             var parser = new Parser(reader);
             var program = parser.nextProgram();
-            System.out.println(program);
             var printer = new Printer();
             // System.out.println(printer.print(program));
             var resolver = new Resolver(new FilePackageResolver());
