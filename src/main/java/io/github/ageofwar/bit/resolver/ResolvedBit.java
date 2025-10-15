@@ -69,6 +69,7 @@ public sealed interface ResolvedBit {
         record Access(Expression expression, String field, Type type, Type returnType) implements Expression {}
         record AccessExtension(Expression expression, Symbol name, Type type, Type returnType) implements Expression {}
         record Struct(Map<String, Expression> fields, Type type, Type returnType) implements Expression {}
+        record Array(List<Expression> elements, Type type, Type returnType) implements Expression {}
         record Function(List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
             public record Parameter(Symbol name, Type type) {}
         }

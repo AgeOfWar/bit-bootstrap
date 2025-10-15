@@ -6,6 +6,7 @@ import io.github.ageofwar.bit.lexer.TokenStream;
 
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -437,7 +438,7 @@ public class Parser {
             case Token.StringLiteral token -> nextString();
             case Token.BooleanLiteral token -> nextBoolean();
             case Token.LeftParenthesis token -> peek[1] instanceof Token.RightParenthesis || peek[2] instanceof Token.Colon ? nextFunction() : nextGroupExpression();
-            case Token.LeftBracket token ->  nextStruct();
+            case Token.LeftBracket token ->  nextStructOrArray();
             case Token.LeftBrace token -> nextBlock();
             case Token.LessThan token -> nextFunction();
             default -> throw error("Expected expression, but got: " + tokens.peek());
@@ -510,11 +511,19 @@ public class Parser {
         return new Bit.Expression.While(condition, body);
     }
 
+    private Bit.Expression nextStructOrArray() {
+        var peek = tokens.peek(4);
+        return switch (peek[1] instanceof Token.NewLine ? peek[3] : peek[2]) {
+            case Token.Colon token -> nextStruct();
+            default -> nextArray();
+        };
+    }
+
     private Bit.Expression.Struct nextStruct() {
         expect(tokens, Token.LeftBracket.class);
         skipNewLines();
         var fields = new HashMap<String, Bit.Expression>();
-        while (!(tokens.peek() instanceof Token.RightBracket)) {
+        while (!matches(tokens, Token.RightBracket.class)) {
             var identifier = expect(tokens, Token.Identifier.class);
             expect(tokens, Token.Colon.class);
             var value = nextExpression();
@@ -526,6 +535,22 @@ public class Parser {
         }
         expect(tokens, Token.RightBracket.class);
         return new Bit.Expression.Struct(fields);
+    }
+
+    private Bit.Expression.Array nextArray() {
+        expect(tokens, Token.LeftBracket.class);
+        skipNewLines();
+        var elements = new ArrayList<Bit.Expression>();
+        while (!matches(tokens, Token.RightBracket.class)) {
+            var element = nextExpression();
+            elements.add(element);
+            if (matches(tokens, Token.Comma.class) || matches(tokens, Token.NewLine.class)) {
+                tokens.next();
+            }
+            skipNewLines();
+        }
+        expect(tokens, Token.RightBracket.class);
+        return new Bit.Expression.Array(elements);
     }
 
     private Bit nextBlockElement() {

@@ -124,11 +124,11 @@ public class TypeParser {
             };
             default -> throw new ParserException("Expected type expression, but got: " + tokens.peek());
         };
-        if (tokens.peek() instanceof Token.LeftParenthesis && expression instanceof Bit.TypeExpression.Identifier identifier) {
+        if (tokens.peek() instanceof Token.LessThan && expression instanceof Bit.TypeExpression.Identifier identifier) {
             tokens.next();
             var arguments = new ArrayList<Bit.TypeExpression>();
             skipNewLines();
-            while (!(tokens.peek() instanceof Token.RightParenthesis)) {
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
                 arguments.add(nextExpression());
                 skipNewLines();
                 if (tokens.peek() instanceof Token.Comma) {
@@ -136,7 +136,7 @@ public class TypeParser {
                     skipNewLines();
                 }
             }
-            expect(tokens, Token.RightParenthesis.class);
+            expect(tokens, Token.GreaterThan.class);
             return new Bit.TypeExpression.Call(identifier, arguments);
         } else {
             return expression;

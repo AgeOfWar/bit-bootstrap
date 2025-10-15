@@ -320,6 +320,7 @@ public class Types {
         if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
         if (!(other instanceof Type.Struct(var fields))) return false;
         for (var entry : fields.entrySet()) {
+            if (!type.fields().containsKey(entry.getKey())) return false;
             if (!extend(type.fields().get(entry.getKey()), entry.getValue())) return false;
         }
         return true;

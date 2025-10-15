@@ -1,11 +1,8 @@
 from io import *
 from format import *
+from collection import *
 
 fun main() {
-    file = new FileReader("test.bit")
-    while (true) {
-        c = file.read()
-        if (c == "") break
-        print(c)
-    }
+    array = [1, 2, 3]
+    print(array)
 }

@@ -129,6 +129,7 @@ public class Printer {
             case Bit.Expression.Is isExpression -> printExpression(isExpression.expression()) + " is " + printTypeExpression(isExpression.type());
             case Bit.Expression.NotEqual notEqual -> printBinaryExpression("!=", notEqual.lhs(), notEqual.rhs());
             case Bit.Expression.Struct struct -> printStruct(struct);
+            case Bit.Expression.Array array -> "[" + String.join(", ", array.elements().stream().map(this::printExpression).toList()) + "]";
             case Bit.Expression.Access access -> printAccess(access);
             case Bit.Expression.And and -> printBinaryExpression("&&", and.lhs(), and.rhs());
             case Bit.Expression.Or or -> printBinaryExpression("||", or.lhs(), or.rhs());

@@ -1,0 +1,27 @@
+type EndOfSequence
+
+type Sequence<T> = [
+    fun next(): T | EndOfSequence
+]
+
+type Iterable<T> = [
+    fun sequence(): Sequence<T>
+]
+
+type List<T> = Iterable<T> & [
+    fun size(): Integer
+    fun get(Integer): T
+    fun toString(): String
+]
+
+type MutableList<T> = List<T> & [
+    fun set(Integer, T): T | None
+    fun add(T): None
+    fun remove(Integer): T | None
+]
+
+type Array<T> = List<T>
+
+type MutableArray<T> = List<T> & [
+    fun set(Integer, T): T | None
+]

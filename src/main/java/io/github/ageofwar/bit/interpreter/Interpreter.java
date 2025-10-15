@@ -167,6 +167,7 @@ public class Interpreter {
             case ResolvedBit.Expression.As asExpression -> eval(asExpression, environment);
             case ResolvedBit.Expression.Is isExpression -> eval(isExpression, environment);
             case ResolvedBit.Expression.Struct struct -> eval(struct, environment);
+            case ResolvedBit.Expression.Array array -> eval(array, environment);
             case ResolvedBit.Expression.Access access -> eval(access, environment);
             case ResolvedBit.Expression.And and -> eval(and, environment);
             case ResolvedBit.Expression.Or or -> eval(or, environment);
@@ -309,6 +310,34 @@ public class Interpreter {
         return new Struct(fields);
     }
 
+    private Object eval(ResolvedBit.Expression.Array array, Environment environment) {
+        var value = array.elements().stream()
+                .map(element -> eval(element, environment))
+                .toArray(Object[]::new);
+        return new Struct(Map.of(
+                "length", (Function<Object[], Object>) args -> BigInteger.valueOf(value.length),
+                "get", (Function<List<Object>, Object>) args -> {
+                    var index = (BigInteger) args.getFirst();
+                    if (index.compareTo(BigInteger.ZERO) < 0 || index.compareTo(BigInteger.valueOf(value.length)) >= 0) {
+                        return none();
+                    }
+                    return value[index.intValue()];
+                },
+                "set", (Function<List<Object>, Object>) args -> {
+                    var index = (BigInteger) args.get(0);
+                    if (index.compareTo(BigInteger.ZERO) < 0 || index.compareTo(BigInteger.valueOf(value.length)) >= 0) {
+                        throw new IndexOutOfBoundsException("Index out of bounds: " + index);
+                    }
+                    var prev = value[index.intValue()];
+                    value[index.intValue()] = args.get(1);
+                    return prev;
+                },
+                "toString", (Function<List<Object>, Object>) args -> {
+                    return "[" + Stream.of(value).map(Objects::toString).collect(Collectors.joining(", ")) + "]";
+                }
+        ));
+    }
+
     private Object eval(ResolvedBit.Expression.As asExpression, Environment environment) {
         var value = eval(asExpression.expression(), environment);
         var type = asExpression.type();
@@ -410,7 +439,7 @@ public class Interpreter {
             if (!(type instanceof Type.Struct(var typeFields))) return false;
             for (var entry : fields.entrySet()) {
                 var fieldType = typeFields.get(entry.getKey());
-                if (fieldType == null || !isAssignable(entry.getValue(), fieldType, environment)) {
+                if (fieldType != null && !isAssignable(entry.getValue(), fieldType, environment)) {
                     return false;
                 }
             }
@@ -419,6 +448,10 @@ public class Interpreter {
 
         if (value instanceof Type.Nominal nominal) {
             return extend(nominal, type);
+        }
+
+        if (value instanceof Function) {
+            return extend(type, function(any())) || extend(type, function(any(), none())) || extend(type, function(any(), none(), none())) || extend(type, function(any(), none(), none(), none())) || extend(type, function(any(), none(), none(), none(), none()));
         }
 
         return false;

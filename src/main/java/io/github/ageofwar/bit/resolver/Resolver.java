@@ -334,6 +334,7 @@ public class Resolver {
             case Bit.Expression.Is is -> resolve(is, environment);
             case Bit.Expression.Access access -> resolve(access, environment);
             case Bit.Expression.Struct struct -> resolve(struct, environment);
+            case Bit.Expression.Array array -> resolve(array, environment);
             case Bit.Expression.Function function -> resolve(function, environment);
             case Bit.Expression.Instantiation instantiation -> resolve(instantiation, environment);
             case Bit.Expression.Return returnExpr -> resolve(returnExpr, environment);
@@ -657,6 +658,21 @@ public class Resolver {
             returnTypes.add(fieldExpr.returnType());
         }
         return new ResolvedBit.Expression.Struct(resolvedFields, struct(fieldTypes), union(returnTypes.toArray(Type[]::new)));
+    }
+
+    private ResolvedBit.Expression resolve(Bit.Expression.Array array, ResolverEnvironment environment) {
+        var elementTypes = new ArrayList<Type>();
+        var resolvedElements = new ArrayList<ResolvedBit.Expression>();
+        var returnTypes = new ArrayList<Type>();
+        for (var element : array.elements()) {
+            var elementExpr = resolve(element, environment);
+            elementTypes.add(elementExpr.type());
+            resolvedElements.add(elementExpr);
+            returnTypes.add(elementExpr.returnType());
+        }
+        var elementType = elementTypes.isEmpty() ? never() : union(elementTypes.toArray(Type[]::new));
+        var mutableArrayType = environment.getFunctionType("MutableArray").type().function().apply(new Type[] { elementType });
+        return new ResolvedBit.Expression.Array(resolvedElements, mutableArrayType, union(returnTypes.toArray(Type[]::new)));
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Function function, ResolverEnvironment environment) {
