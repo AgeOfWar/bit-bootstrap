@@ -4,10 +4,7 @@ import io.github.ageofwar.bit.resolver.ResolvedBit;
 import io.github.ageofwar.bit.types.Type;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -15,6 +12,8 @@ import java.util.stream.Stream;
 import static io.github.ageofwar.bit.types.Types.*;
 
 public class Interpreter {
+    private Object eos;
+
     @SuppressWarnings("unchecked")
     public void interpret(ResolvedBit.Program program, String mainFunctionName) {
         var environment = Environment.init(program.variables());
@@ -87,6 +86,9 @@ public class Interpreter {
     private void interpret(ResolvedBit.Declaration.Type type, Environment environment) {
         if (type.valueName() != null) {
             environment.assignVariable(type.valueName(), type.value());
+            if (type.value() instanceof Type.Nominal(var name) && name.equals("EndOfSequence")) {
+                eos = type.value();
+            }
         }
     }
 
@@ -334,6 +336,14 @@ public class Interpreter {
                 },
                 "toString", (Function<List<Object>, Object>) args -> {
                     return "[" + Stream.of(value).map(Objects::toString).collect(Collectors.joining(", ")) + "]";
+                },
+                "sequence", (Function<List<Object>, Object>) args -> {
+                    var iterator = Arrays.stream(value).iterator();
+                    return new Struct(Map.of(
+                            "next", (Function<List<Object>, Object>) a -> {
+                                return iterator.hasNext() ? iterator.next() : eos;
+                            }
+                    ));
                 }
         ));
     }

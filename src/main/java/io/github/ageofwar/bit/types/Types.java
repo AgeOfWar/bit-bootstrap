@@ -201,7 +201,21 @@ public class Types {
         switch (partialType) { // TODO: handle more complex types
             case Type.Union(var partialTypes) -> {}
             case Type.Intersection(var partialTypes) -> {}
-            case Type.Function(var returnType, var generics, var parameters) -> {}
+            case Type.Function(var returnType, var generics, var parameters) -> {
+                var actualFn = (Type.Function) actualType;
+
+                for (var i = 0; i < generics.size(); i++) {
+                    var partialGeneric = generics.get(i);
+                    var actualGeneric = actualFn.generics().get(i);
+                    unify(partialGeneric, actualGeneric, mapping);
+                }
+
+                for (var i = 0; i < parameters.length; i++) {
+                    unify(parameters[i], actualFn.parameters()[i], mapping);
+                }
+
+                unify(returnType, actualFn.returnType(), mapping);
+            }
             case Type.Struct(var fields) -> unify(new ArrayList<>(fields.values()), new ArrayList<>(((Type.Struct) actualType).fields().values()), mapping);
             default -> {}
         }
@@ -211,6 +225,12 @@ public class Types {
         if (extend(type1, type2)) return type2;
         if (extend(type2, type1)) return type1;
         return union(type1, type2);
+    }
+
+    private static Type unifyContravariant(Type type1, Type type2) {
+        if (extend(type1, type2)) return type1;
+        if (extend(type2, type1)) return type2;
+        return intersection(type1, type2);
     }
 
     public static Type typeOf(Type type) {

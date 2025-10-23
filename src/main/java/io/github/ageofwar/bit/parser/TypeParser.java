@@ -116,7 +116,15 @@ public class TypeParser {
             case Token.NumberLiteral token -> nextNumberLiteral();
             case Token.StringLiteral token -> nextStringLiteral();
             case Token.BooleanLiteral token -> nextBooleanLiteral();
-            case Token.LeftParenthesis token -> peek[1] instanceof Token.RightParenthesis || peek[2] instanceof Token.Colon ? nextFunction() : nextGroupedExpression();
+            case Token.LeftParenthesis token -> {
+                try {
+                    tokens.checkpoint();
+                    yield nextFunction();
+                } catch (ParserException e) {
+                    tokens.rollback();
+                    yield nextGroupedExpression();
+                }
+            }
             case Token.LeftBracket token -> nextStruct();
             case Token.Keyword keyword -> switch (keyword.type()) {
                 case Token.Keyword.Type.MATCH -> nextMatch();
