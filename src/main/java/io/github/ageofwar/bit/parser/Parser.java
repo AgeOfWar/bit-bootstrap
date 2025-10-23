@@ -384,10 +384,11 @@ public class Parser {
             }
             if (matches(tokens, Token.LeftParenthesis.class) || matches(tokens, Token.LessThan.class)) {
                 try {
+                    tokens.checkpoint();
                     lhs = nextCall(lhs);
                     continue;
                 } catch (ParserException ignored) {
-                    ignored.printStackTrace();
+                    tokens.rollback();
                 }
             }
             tokens.next();

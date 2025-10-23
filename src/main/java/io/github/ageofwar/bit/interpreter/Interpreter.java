@@ -315,7 +315,7 @@ public class Interpreter {
                 .map(element -> eval(element, environment))
                 .toArray(Object[]::new);
         return new Struct(Map.of(
-                "length", (Function<Object[], Object>) args -> BigInteger.valueOf(value.length),
+                "size", (Function<List<Object>, Object>) args -> BigInteger.valueOf(value.length),
                 "get", (Function<List<Object>, Object>) args -> {
                     var index = (BigInteger) args.getFirst();
                     if (index.compareTo(BigInteger.ZERO) < 0 || index.compareTo(BigInteger.valueOf(value.length)) >= 0) {

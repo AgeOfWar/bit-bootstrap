@@ -104,7 +104,7 @@ public class Types {
     }
 
     public static Type intersection(Type... types) {
-        var actualTypes = new ArrayList<Type>();
+        var actualType = any();
 
         for (var type : types) {
             if (type == ANY) continue;
@@ -113,29 +113,32 @@ public class Types {
                 for (var subType : subTypes) {
                     if (subType == ANY) continue;
                     if (subType == NEVER) return NEVER;
-                    if (actualTypes.stream().anyMatch(t -> extend(t, subType))) continue;
-                    actualTypes.removeIf(t -> extend(subType, t));
-                    actualTypes.add(subType);
+                    if (extend(actualType, subType)) continue;
+                    if (extend(subType, actualType)) actualType = subType;
                 }
                 continue;
             }
-            if (actualTypes.stream().anyMatch(t -> extend(t, type))) continue;
-            actualTypes.removeIf(t -> extend(type, t));
-            actualTypes.add(type);
-        }
-
-        if (actualTypes.isEmpty()) return ANY;
-        if (actualTypes.size() == 1) return actualTypes.getFirst();
-
-        for (var type1 : actualTypes) {
-            for (var type2 : actualTypes) {
-                if (type1 != type2 && !compatible(type1, type2)) {
-                    return NEVER;
+            if (extend(actualType, type)) continue;
+            if (extend(type, actualType)) actualType = type;
+            if (actualType instanceof Type.Struct(var fields) && type instanceof Type.Struct(var newFields)) {
+                var mergedFields = new HashMap<>(fields);
+                mergedFields.putAll(newFields);
+                for (var entry : newFields.entrySet()) {
+                    if (fields.containsKey(entry.getKey())) {
+                        mergedFields.put(entry.getKey(), intersection(fields.get(entry.getKey()), entry.getValue()));
+                    }
                 }
+                actualType = struct(mergedFields);
+            }
+            if (actualType instanceof Type.Union(var unionTypes)) {
+                actualType = union(Stream.of(unionTypes).filter(t -> extend(type, t)).toArray(Type[]::new));
+            }
+            if (type instanceof Type.Union(var unionTypes)) {
+                var tt = actualType;
+                actualType = union(Stream.of(unionTypes).filter(t -> extend(tt, t)).toArray(Type[]::new));
             }
         }
-
-        return new Type.Intersection(actualTypes.toArray(Type[]::new));
+        return actualType;
     }
 
     public static Type.TypeVariable generic(Type extendsType) {
@@ -208,20 +211,6 @@ public class Types {
         if (extend(type1, type2)) return type2;
         if (extend(type2, type1)) return type1;
         return union(type1, type2);
-    }
-
-    private static boolean compatible(Type type, Type other) {
-        return switch (type) {
-            case Type.Struct struct -> {
-                if (!(other instanceof Type.Struct(var fields))) yield false;
-                for (var entry : struct.fields().entrySet()) {
-                    var otherField = fields.get(entry.getKey());
-                    if (otherField != null && !compatible(entry.getValue(), otherField)) yield false;
-                }
-                yield true;
-            }
-            default -> false;
-        };
     }
 
     public static Type typeOf(Type type) {

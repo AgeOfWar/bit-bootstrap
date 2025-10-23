@@ -4,5 +4,9 @@ from collection import *
 
 fun main() {
     array = [1, 2, 3]
-    print(array)
+    var i: Integer = 0
+    while (i < array.size()) {
+        println(array.get(i))
+        mut i = i + 1
+    }
 }

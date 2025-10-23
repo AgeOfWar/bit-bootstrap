@@ -53,7 +53,7 @@ public sealed interface Token {
             PUBLIC("public"),
             PRIVATE("private"),
             VAR("var"),
-            SET("s"),
+            SET("mut"),
             IMPLEMENT("impl"),
             FROM("from"),
             IMPORT("import");
