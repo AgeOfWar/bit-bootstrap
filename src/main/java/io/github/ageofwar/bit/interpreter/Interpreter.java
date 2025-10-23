@@ -21,7 +21,7 @@ public class Interpreter {
 
         ResolvedBit.Symbol mainSymbol = null;
         for (var declaration : program.declarations()) {
-            if (declaration.name().name().equals(mainFunctionName)) {
+            if (declaration.name() != null && declaration.name().name().equals(mainFunctionName)) {
                 mainSymbol = declaration.name();
                 break;
             }

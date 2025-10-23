@@ -29,7 +29,12 @@ public sealed interface ResolvedBit {
                 public record Parameter(Symbol name, io.github.ageofwar.bit.types.Type type) {}
             }
         }
-        record Implementation(Symbol name, io.github.ageofwar.bit.types.Type receiver, List<Function> extensions) implements Declaration {
+        record Implementation(List<GenericDeclaration> generics, io.github.ageofwar.bit.types.Type receiver, List<Function> extensions) implements Declaration {
+            @Override
+            public Symbol name() {
+                return null;
+            }
+
             public record Function(Symbol name, Symbol thisSymbol, List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, io.github.ageofwar.bit.types.Type type) {
                 public record Parameter(Symbol name, io.github.ageofwar.bit.types.Type type) {}
             }

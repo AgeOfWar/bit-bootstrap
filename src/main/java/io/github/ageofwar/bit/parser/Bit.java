@@ -46,7 +46,12 @@ public sealed interface Bit {
                 public record Parameter(String name, TypeExpression type) {}
             }
         }
-        record Implementation(String name, List<Function> extensions) implements Declaration {}
+        record Implementation(TypeExpression type, List<GenericDeclaration> generics, List<Function> extensions) implements Declaration {
+            @Override
+            public String name() {
+                return "<impl>";
+            }
+        }
     }
 
     record VariableAssignment(Bit.Expression name, Expression value) implements Bit {}

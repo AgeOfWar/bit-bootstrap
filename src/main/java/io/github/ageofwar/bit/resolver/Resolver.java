@@ -225,23 +225,31 @@ public class Resolver {
     }
 
     private ResolvedBit.Declaration.Implementation resolve(Bit.Declaration.Implementation implementation, ResolverEnvironment environment) {
-        var entry = environment.getType(implementation.name());
-        if (entry == null) {
-            throw new ResolverException("Type '" + implementation.name() + "' is not defined in the current scope.");
+        var extensionsEnvironment = new ResolverEnvironment(environment);
+        var generics = new ArrayList<ResolvedBit.GenericDeclaration>();
+        if (implementation.generics() != null) {
+            for (var generic : implementation.generics()) {
+                var bounds = resolve(generic.extendsType(), extensionsEnvironment);
+                var type = generic(bounds);
+                var symbol = extensionsEnvironment.declareType(generic.name(), type);
+                type.setSymbol(symbol);
+                generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+            }
         }
-        var receiver = entry.type();
+
+        var receiver = resolve(implementation.type(), extensionsEnvironment);
 
         var extensions = new ArrayList<ResolvedBit.Declaration.Implementation.Function>();
         for (var func : implementation.extensions()) {
-            var functionEnvironment = new ResolverEnvironment(environment);
+            var functionEnvironment = new ResolverEnvironment(extensionsEnvironment);
 
-            var generics = new ArrayList<ResolvedBit.GenericDeclaration>();
+            var fnGenerics = new ArrayList<ResolvedBit.GenericDeclaration>();
             for (var generic : func.generics()) {
                 var bounds = resolve(generic.extendsType(), functionEnvironment);
                 var type = generic(bounds);
                 var symbol = functionEnvironment.declareType(generic.name(), type);
                 type.setSymbol(symbol);
-                generics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
+                fnGenerics.add(new ResolvedBit.GenericDeclaration(symbol, bounds, type));
             }
 
             var parameters = new ArrayList<ResolvedBit.Declaration.Implementation.Function.Parameter>();
@@ -254,17 +262,17 @@ public class Resolver {
             }
 
             var returnType = func.returnType() == null ? none() : resolve(func.returnType(), functionEnvironment);
-            var functionType = function(returnType, generics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameters.stream().map(ResolvedBit.Declaration.Implementation.Function.Parameter::type).toArray(Type[]::new));
+            var functionType = function(returnType, fnGenerics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameters.stream().map(ResolvedBit.Declaration.Implementation.Function.Parameter::type).toArray(Type[]::new));
             var symbol = environment.declareExtensionType(func.name(), receiver, functionType);
 
             var body = resolve(func.body(), functionEnvironment);
             if (!extend(body.type(), returnType)) {
                 throw new ResolverException("Type mismatch: expected " + returnType + " but got " + body.type());
             }
-            extensions.add(new ResolvedBit.Declaration.Implementation.Function(symbol, thisSymbol, generics, parameters, body, functionType));
+            extensions.add(new ResolvedBit.Declaration.Implementation.Function(symbol, thisSymbol, fnGenerics, parameters, body, functionType));
         }
 
-        return new ResolvedBit.Declaration.Implementation(entry.symbol(), receiver, extensions);
+        return new ResolvedBit.Declaration.Implementation(generics, receiver, extensions);
     }
 
     private ResolvedBit.Declaration.Type resolve(Bit.Declaration.Type declaration, ResolverEnvironment environment) {
@@ -634,7 +642,14 @@ public class Resolver {
             throw new ResolverException("Type '" + expr.type() + "' does not have method '" + access.field() + "'.");
         }
         var functionTypes = extensions.stream()
-                .filter(funcType -> extend(expr.type(), funcType.receiverType()))
+                .filter(funcType -> {
+                    var unified = unify(
+                            List.of(funcType.receiverType()),
+                            List.of(expr.type())
+                    );
+                    var completed = complete(funcType.receiverType(), unified);
+                    return extend(expr.type(), completed);
+                })
                 .toList();
         if (functionTypes.isEmpty()) {
             throw new ResolverException("Type '" + expr.type() + "' does not have method '" + access.field() + "'.");
@@ -643,7 +658,12 @@ public class Resolver {
             throw new ResolverException("Ambiguous method call: type '" + expr.type() + "' has multiple methods named '" + access.field() + "'.");
         }
         var functionType = functionTypes.getFirst();
-        return new ResolvedBit.Expression.AccessExtension(expr, functionType.symbol(), functionType.type(), expr.returnType());
+        var receiverGenericsActualTypes = unify(
+                List.of(functionType.receiverType()),
+                List.of(expr.type())
+        );
+        var functionTypeCompleted = (Type.Function) complete(functionType.type(), receiverGenericsActualTypes);
+        return new ResolvedBit.Expression.AccessExtension(expr, functionType.symbol(), functionTypeCompleted, expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Struct struct, ResolverEnvironment environment) {

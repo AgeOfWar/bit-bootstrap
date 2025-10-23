@@ -4,5 +4,5 @@ from collection import *
 
 fun main() {
     array = [1, 2, 3]
-    forEach(array, println)
+    array.forEach(println)
 }

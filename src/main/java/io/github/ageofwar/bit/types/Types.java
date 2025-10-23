@@ -165,7 +165,7 @@ public class Types {
         return complete(type, mapping);
     }
 
-    private static Type complete(Type type, Map<Type.TypeVariable, Type> mapping) {
+    public static Type complete(Type type, Map<Type.TypeVariable, Type> mapping) {
         return switch (type) {
             case Type.TypeVariable t -> mapping.getOrDefault(type, complete(t.bounds(), mapping));
             case Type.Union(var types) -> union(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
@@ -189,32 +189,45 @@ public class Types {
     }
 
     private static void unify(Type partialType, Type actualType, Map<Type.TypeVariable, Type> mapping) {
+        unify(partialType, actualType, mapping, true);
+    }
+
+    private static void unify(Type partialType, Type actualType, Map<Type.TypeVariable, Type> mapping, boolean covariant) {
         if (partialType instanceof Type.TypeVariable typeVariable) {
             var mappedType = mapping.get(typeVariable);
             if (mappedType == null) {
                 mapping.put(typeVariable, actualType);
             } else {
-                mapping.put(typeVariable, unifyCovariant(mappedType, actualType));
+                mapping.put(typeVariable, covariant ? unifyCovariant(mappedType, actualType) : unifyContravariant(mappedType, actualType));
             }
         }
 
-        switch (partialType) { // TODO: handle more complex types
-            case Type.Union(var partialTypes) -> {}
-            case Type.Intersection(var partialTypes) -> {}
+        switch (partialType) {
+            case Type.Union(var partialTypes) -> {
+                for (var type : partialTypes) {
+                    if (!(actualType instanceof Type.Union(var actualTypes))) continue;
+                    if (extend(type, actualType)) {
+                        unify(union(Arrays.stream(partialTypes).filter(t -> t != type).toArray(Type[]::new)), union(Arrays.stream(actualTypes).filter(t -> !extend(type, t)).toArray(Type[]::new)), mapping, covariant);
+                    }
+                }
+            }
+            case Type.Intersection(var partialTypes) -> {
+                // TODO
+            }
             case Type.Function(var returnType, var generics, var parameters) -> {
                 var actualFn = (Type.Function) actualType;
 
                 for (var i = 0; i < generics.size(); i++) {
                     var partialGeneric = generics.get(i);
                     var actualGeneric = actualFn.generics().get(i);
-                    unify(partialGeneric, actualGeneric, mapping);
+                    unify(partialGeneric, actualGeneric, mapping, !covariant);
                 }
 
                 for (var i = 0; i < parameters.length; i++) {
-                    unify(parameters[i], actualFn.parameters()[i], mapping);
+                    unify(parameters[i], actualFn.parameters()[i], mapping, covariant);
                 }
 
-                unify(returnType, actualFn.returnType(), mapping);
+                unify(returnType, actualFn.returnType(), mapping, covariant);
             }
             case Type.Struct(var fields) -> unify(new ArrayList<>(fields.values()), new ArrayList<>(((Type.Struct) actualType).fields().values()), mapping);
             default -> {}

@@ -314,7 +314,29 @@ public class Parser {
 
     private Bit.Declaration.Implementation nextImplementation() {
         expect(tokens, Token.Keyword.Type.IMPLEMENT);
-        var identifier = expect(tokens, Token.Identifier.class);
+        List<Bit.GenericDeclaration> generics = null;
+        if (matches(tokens, Token.LessThan.class)) {
+            generics = new ArrayList<>();
+            tokens.next();
+            skipNewLines();
+            while (!(tokens.peek() instanceof Token.GreaterThan)) {
+                var genericName = expect(tokens, Token.Identifier.class);
+                Bit.TypeExpression genericType = new Bit.TypeExpression.Identifier("Any");
+                if (matches(tokens, Token.Colon.class)) {
+                    tokens.next();
+                    genericType = typeParser.nextExpression();
+                }
+                generics.add(new Bit.Declaration.GenericDeclaration(genericName.name(), genericType));
+                if (matches(tokens, Token.Comma.class)) {
+                    tokens.next();
+                } else {
+                    break;
+                }
+                skipNewLines();
+            }
+            expect(tokens, Token.GreaterThan.class);
+        }
+        var type = typeParser.nextExpression();
         expect(tokens, Token.LeftBrace.class);
         skipNewLines();
         var extensions = new ArrayList<Bit.Declaration.Function>();
@@ -324,7 +346,7 @@ public class Parser {
             skipNewLines();
         }
         expect(tokens, Token.RightBrace.class);
-        return new Bit.Declaration.Implementation(identifier.name(), extensions);
+        return new Bit.Declaration.Implementation(type, generics, extensions);
     }
 
     private Bit.Expression.Call nextCall(Bit.Expression expression) {
