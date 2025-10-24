@@ -263,7 +263,7 @@ public class Resolver {
 
             var returnType = func.returnType() == null ? none() : resolve(func.returnType(), functionEnvironment);
             var functionType = function(returnType, fnGenerics.stream().map(g -> (Type.TypeVariable) g.type()).toList(), parameters.stream().map(ResolvedBit.Declaration.Implementation.Function.Parameter::type).toArray(Type[]::new));
-            var symbol = environment.declareExtensionType(func.name(), receiver, functionType);
+            var symbol = environment.declareExtensionType(func.name(), receiver, functionType, generics.stream().map(ResolvedBit.GenericDeclaration::type).toList());
 
             var body = resolve(func.body(), functionEnvironment);
             if (!extend(body.type(), returnType)) {
@@ -663,7 +663,15 @@ public class Resolver {
                 List.of(expr.type())
         );
         var functionTypeCompleted = (Type.Function) complete(functionType.type(), receiverGenericsActualTypes);
-        return new ResolvedBit.Expression.AccessExtension(expr, functionType.symbol(), functionTypeCompleted, expr.returnType());
+        var generics = new ArrayList<Type>();
+        for (var generic : functionType.receiverGenerics()) {
+            var actualType = receiverGenericsActualTypes.get(generic);
+            if (actualType == null) {
+                throw new ResolverException("Could not infer generic type: " + generic);
+            }
+            generics.add(actualType);
+        }
+        return new ResolvedBit.Expression.AccessExtension(expr, generics, functionType.symbol(), functionTypeCompleted, expr.returnType());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.Struct struct, ResolverEnvironment environment) {

@@ -24,7 +24,6 @@ public class ResolverEnvironment {
     private final ScopedTable<List<ExtensionType>> extensionTypes;
 
     private AtomicInteger variablesCount;
-    private int typesCount;
 
     public static ResolverEnvironment init() {
         var environment = new ResolverEnvironment(null);
@@ -36,7 +35,7 @@ public class ResolverEnvironment {
         environment.declareValueType("__file_read", function(string(), any()));
         environment.declareValueType("__file_write", function(none(), any(), string()));
 
-        environment.declareExtensionType("toString", integer(), function(string()));
+        environment.declareExtensionType("toString", integer(), function(string()), List.of());
 
         environment.declareType("Any", any());
         environment.declareType("Never", never());
@@ -56,18 +55,10 @@ public class ResolverEnvironment {
         this.extensionTypes = new ScopedTable<>(parent != null ? parent.extensionTypes : null);
         this.constructors = new ScopedTable<>(parent != null ? parent.constructors : null);
         variablesCount = parent != null ? parent.variablesCount : new AtomicInteger();
-        typesCount = parent != null ? parent.typesCount : 0;
     }
 
     public int variables() {
         return variablesCount.get();
-    }
-
-    public void incrementTypesCount() {
-        if (parent != null) {
-            parent.incrementTypesCount();
-        }
-        typesCount++;
     }
 
     public ResolvedBit.Symbol declareVariableType(String name, Type type) {
@@ -112,9 +103,8 @@ public class ResolverEnvironment {
             throw new RuntimeException("Type already declared: " + name);
         }
 
-        var symbol = new ResolvedBit.Symbol(name, typesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         types.declare(name, new ValueType(symbol, type));
-        incrementTypesCount();
         return symbol;
     }
 
@@ -132,9 +122,8 @@ public class ResolverEnvironment {
             throw new RuntimeException("Function type already declared: " + name);
         }
 
-        var symbol = new ResolvedBit.Symbol(name, typesCount);
+        var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         functionTypes.declare(name, new ValueTypeFunction(symbol, type));
-        incrementTypesCount();
         return symbol;
     }
 
@@ -160,10 +149,10 @@ public class ResolverEnvironment {
         return value;
     }
 
-    public ResolvedBit.Symbol declareExtensionType(String name, Type receiverType, Type type) {
+    public ResolvedBit.Symbol declareExtensionType(String name, Type receiverType, Type type, List<Type> receiverGenerics) {
         var symbol = new ResolvedBit.Symbol(name, variablesCount.getAndIncrement());
         var candidates = extensionTypes.getSymbols().computeIfAbsent(name, k -> new ArrayList<>());
-        candidates.add(new ExtensionType(symbol, receiverType, type));
+        candidates.add(new ExtensionType(symbol, receiverType, type, receiverGenerics));
         return symbol;
     }
 
@@ -214,7 +203,7 @@ public class ResolverEnvironment {
     public record VariableType(ResolvedBit.Symbol symbol, Type type, boolean variable) {
 
     }
-    public record ExtensionType(ResolvedBit.Symbol symbol, Type receiverType, Type type) {
+    public record ExtensionType(ResolvedBit.Symbol symbol, Type receiverType, Type type, List<Type> receiverGenerics) {
 
     }
 

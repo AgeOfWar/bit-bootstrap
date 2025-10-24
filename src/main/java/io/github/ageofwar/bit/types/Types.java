@@ -167,7 +167,7 @@ public class Types {
 
     public static Type complete(Type type, Map<Type.TypeVariable, Type> mapping) {
         return switch (type) {
-            case Type.TypeVariable t -> mapping.getOrDefault(type, complete(t.bounds(), mapping));
+            case Type.TypeVariable t -> mapping.getOrDefault(type, type);
             case Type.Union(var types) -> union(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
             case Type.Intersection(var types) -> intersection(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
             case Type.Function(var returnType, var generics, var parameters) -> function(complete(returnType, mapping), generics, Stream.of(parameters).map(p -> complete(p, mapping)).toArray(Type[]::new));
@@ -349,6 +349,8 @@ public class Types {
     }
 
     public static boolean extend(Type.TypeVariable typeVariable, Type other) {
+        if (other instanceof Type.TypeVariable otherTypeVariable) return typeVariable.name().equals(otherTypeVariable.name());
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(typeVariable, t));
         return extend(typeVariable.bounds(), other);
     }
 

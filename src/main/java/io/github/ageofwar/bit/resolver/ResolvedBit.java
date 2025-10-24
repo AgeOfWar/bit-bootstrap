@@ -72,7 +72,7 @@ public sealed interface ResolvedBit {
         record As(Expression expression, Type type, Type returnType) implements Expression {}
         record Is(Expression expression, Type checkType, Type type, Type returnType) implements Expression {}
         record Access(Expression expression, String field, Type type, Type returnType) implements Expression {}
-        record AccessExtension(Expression expression, Symbol name, Type type, Type returnType) implements Expression {}
+        record AccessExtension(Expression expression, List<Type> generics, Symbol name, Type type, Type returnType) implements Expression {}
         record Struct(Map<String, Expression> fields, Type type, Type returnType) implements Expression {}
         record Array(List<Expression> elements, Type type, Type returnType) implements Expression {}
         record Function(List<GenericDeclaration> generics, List<Parameter> parameters, Expression body, Type type, Type returnType) implements Expression {
@@ -87,26 +87,10 @@ public sealed interface ResolvedBit {
 
     record GenericDeclaration(Symbol name, Type extendsType, Type type) {}
 
-    final class Symbol {
-        private final String name;
-        private final int id;
-
-        public Symbol(String name, int id) {
-            this.name = name;
-            this.id = id;
-        }
-
+    record Symbol(String name, int id) {
         @Override
         public String toString() {
             return name + "#" + id;
-        }
-
-        public String name() {
-            return name;
-        }
-
-        public int id() {
-            return id;
         }
     }
 }

@@ -26,17 +26,19 @@ type MutableArray<T> = List<T> & [
     fun set(Integer, T): T | None
 ]
 
-impl <T> Iterable<T> {
-    fun forEach(action: (T) -> None): None {
-        seq = this.sequence()
+impl<T> Sequence<T> {
+    fun forEachRemaining(action: (T) -> None): None {
         while (true) {
-            item = seq.next()
-            if (item == EndOfSequence) {
-                break
-            } else {
-                action(item)
-            }
+            item = this.next()
+            if (item == EndOfSequence) break
+            action(item as T)
         }
+    }
+}
+
+impl<T> Iterable<T> {
+    fun forEach(action: (T) -> None): None {
+        this.sequence().forEachRemaining(action)
     }
 }
 

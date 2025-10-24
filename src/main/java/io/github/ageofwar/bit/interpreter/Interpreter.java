@@ -128,10 +128,14 @@ public class Interpreter {
         for (var function : implementation.extensions()) {
             environment.assignVariable(function.name(), (Function<List<Object>, Object>) args -> {
                 environment.assignVariable(function.thisSymbol(), args.getFirst());
-                for (var i = 0; i < function.generics().size(); i++) {
-                    environment.assignVariable(function.generics().get(i).name(), args.get(i + 1));
+                for (var i = 0; i < implementation.generics().size(); i++) {
+                    environment.assignVariable(implementation.generics().get(i).name(), args.get(i + 1));
                 }
-                var offset = function.generics().size() + 1;
+                var offset = implementation.generics().size() + 1;
+                for (var i = 0; i < function.generics().size(); i++) {
+                    environment.assignVariable(function.generics().get(i).name(), args.get(offset + i));
+                }
+                offset += function.generics().size();
                 for (var i = 0; i < function.parameters().size(); i++) {
                     environment.assignVariable(function.parameters().get(i).name(), args.get(offset + i));
                 }
@@ -378,6 +382,7 @@ public class Interpreter {
         return (Function<List<Object>, Object>) args -> {
             var newArgs = new ArrayList<>();
             newArgs.add(value);
+            newArgs.addAll(access.generics());
             newArgs.addAll(args);
             return function.apply(newArgs);
         };
