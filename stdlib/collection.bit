@@ -1,7 +1,5 @@
-type EndOfSequence
-
 type Sequence<T> = [
-    fun next(): T | EndOfSequence
+    fun next(): T | None
 ]
 
 type Iterable<T> = [
@@ -10,8 +8,7 @@ type Iterable<T> = [
 
 type List<T> = Iterable<T> & [
     fun size(): Integer
-    fun get(Integer): T
-    fun toString(): String
+    fun get(Integer): T | None
 ]
 
 type MutableList<T> = List<T> & [
@@ -30,7 +27,7 @@ impl<T> Sequence<T> {
     fun forEachRemaining(action: (T) -> None): None {
         while (true) {
             item = this.next()
-            if (item == EndOfSequence) break
+            if (item is None) break
             action(item as T)
         }
     }

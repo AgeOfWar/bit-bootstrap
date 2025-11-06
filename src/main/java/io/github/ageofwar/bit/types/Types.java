@@ -11,7 +11,6 @@ public class Types {
     private static final Type TRUE = new Type.Nominal("true");
     private static final Type FALSE = new Type.Nominal("false");
     private static final Type INTEGER = new Type.Integer();
-    private static final Type STRING = new Type.String();
 
     private Types() {
     }
@@ -52,12 +51,13 @@ public class Types {
         return new Type.Union(_true(), _false());
     }
 
-    public static Type string(String value) {
-        return new Type.StringLiteral(value);
-    }
-
     public static Type string() {
-        return STRING;
+        var fields = new HashMap<String, Type>();
+        var string = struct(fields);
+        fields.put("sequence", function(struct(Map.of("next", function(union(string, none()))))));
+        fields.put("size", function(integer()));
+        fields.put("get", function(string, integer()));
+        return string;
     }
 
     public static Type struct(Map<String, Type> fields) {
@@ -166,14 +166,46 @@ public class Types {
     }
 
     public static Type complete(Type type, Map<Type.TypeVariable, Type> mapping) {
-        return switch (type) {
+        return complete(type, mapping, new IdentityHashMap<>());
+    }
+
+    private static Type complete(Type type, Map<Type.TypeVariable, Type> mapping, Map<Type, Type> visited) {
+        if (visited.containsKey(type)) {
+            return visited.get(type);
+        }
+
+        Type result = switch (type) {
             case Type.TypeVariable t -> mapping.getOrDefault(type, type);
-            case Type.Union(var types) -> union(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
-            case Type.Intersection(var types) -> intersection(Stream.of(types).map(t -> complete(t, mapping)).toArray(Type[]::new));
-            case Type.Function(var returnType, var generics, var parameters) -> function(complete(returnType, mapping), generics, Stream.of(parameters).map(p -> complete(p, mapping)).toArray(Type[]::new));
-            case Type.Struct(var fields) -> struct(fields.entrySet().stream().collect(HashMap::new, (m, e) -> m.put(e.getKey(), complete(e.getValue(), mapping)), HashMap::putAll));
+            case Type.Union(var types) ->
+                    union(Stream.of(types)
+                            .map(t -> complete(t, mapping, visited))
+                            .toArray(Type[]::new));
+            case Type.Intersection(var types) ->
+                    intersection(Stream.of(types)
+                            .map(t -> complete(t, mapping, visited))
+                            .toArray(Type[]::new));
+            case Type.Function(var returnType, var generics, var parameters) ->
+                    function(
+                            complete(returnType, mapping, visited),
+                            generics,
+                            Stream.of(parameters)
+                                    .map(p -> complete(p, mapping, visited))
+                                    .toArray(Type[]::new)
+                    );
+            case Type.Struct(var fields) -> {
+                var copy = new HashMap<String, Type>();
+                var struct = struct(copy);
+                visited.put(type, struct); // Importante: registra PRIMA di ricorrere
+                for (var e : fields.entrySet()) {
+                    copy.put(e.getKey(), complete(e.getValue(), mapping, visited));
+                }
+                yield struct;
+            }
             default -> type;
         };
+
+        visited.put(type, result);
+        return result;
     }
 
     public static Map<Type.TypeVariable, Type> unify(List<Type> partialTypes, List<Type> actualTypes) {
@@ -205,6 +237,9 @@ public class Types {
         switch (partialType) {
             case Type.Union(var partialTypes) -> {
                 for (var type : partialTypes) {
+                    if (extend(actualType, never())) {
+                        unify(type, never(), mapping, covariant);
+                    }
                     if (!(actualType instanceof Type.Union(var actualTypes))) continue;
                     if (extend(type, actualType)) {
                         unify(union(Arrays.stream(partialTypes).filter(t -> t != type).toArray(Type[]::new)), union(Arrays.stream(actualTypes).filter(t -> !extend(type, t)).toArray(Type[]::new)), mapping, covariant);
@@ -215,7 +250,7 @@ public class Types {
                 // TODO
             }
             case Type.Function(var returnType, var generics, var parameters) -> {
-                var actualFn = (Type.Function) actualType;
+                var actualFn = (Type.Function) (actualType instanceof Type.Function ? actualType : function(never(), never(), never(), never(), never(), never(), never(), never(), never(), never()));
 
                 for (var i = 0; i < generics.size(); i++) {
                     var partialGeneric = generics.get(i);
@@ -229,7 +264,7 @@ public class Types {
 
                 unify(returnType, actualFn.returnType(), mapping, covariant);
             }
-            case Type.Struct(var fields) -> unify(new ArrayList<>(fields.values()), new ArrayList<>(((Type.Struct) actualType).fields().values()), mapping);
+            case Type.Struct(var fields) -> unify(new ArrayList<>(fields.values()), new ArrayList<>( actualType instanceof Type.Struct ? ((Type.Struct) actualType).fields().values() : fields.values().stream().map((f) -> never()).toList()) , mapping);
             default -> {}
         }
     }
@@ -246,112 +281,94 @@ public class Types {
         return intersection(type1, type2);
     }
 
-    public static Type typeOf(Type type) {
-        return switch (type) {
-            case Type.Never never -> struct(Map.of("type", string("Never")));
-            case Type.Any any -> struct(Map.of("type", string("Any")));
-            case Type.Nominal nominal -> struct(Map.of("type", string(nominal.name())));
-            case Type.NumberLiteral numberLiteral -> struct(Map.of("type", string("Number"), "value", integer(numberLiteral.value())));
-            case Type.StringLiteral stringLiteral -> struct(Map.of("type", string("String"), "value", string(stringLiteral.value())));
-            case Type.Integer integer -> struct(Map.of("type", string("Integer")));
-            case Type.String string -> struct(Map.of("type", string("String")));
-            case Type.Struct struct -> struct(Map.of("type", string("Struct"), "fields", struct(struct.fields().entrySet().stream().map(e -> Map.entry(e.getKey(), typeOf(e.getValue()))).collect(HashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), HashMap::putAll))));
-            case Type.Union union -> struct(Map.of("type", string("Union"), "types", union(Stream.of(union.types()).map(Types::typeOf).toArray(Type[]::new))));
-            case Type.Intersection intersection -> struct(Map.of("type", string("Intersection"), "types", union(Stream.of(intersection.types()).map(Types::typeOf).toArray(Type[]::new))));
-            case Type.Function function -> struct(Map.of("type", string("Function"), "returnType", typeOf(function.returnType()), "parameters", union(Stream.of(function.parameters()).map(Types::typeOf).toArray(Type[]::new))));
-            case Type.TypeVariable typeVariable -> throw new AssertionError();
-        };
-    }
-
     // extends
 
     public static boolean extend(Type type, Type other) {
+        return extend(type, other, new HashSet<>());
+    }
+
+    private record Pair<T, U>(T first, U second) {}
+    private static boolean extend(Type type, Type other, Set<Pair<Type, Type>> visited) {
+        var pair = new Pair<>(type, other);
+        if (visited.contains(pair)) {
+            // Se abbiamo già controllato questa coppia, evitiamo di rieseguire
+            return true;
+        }
+        visited.add(pair);
+
         if (type == other) return true;
-        if (other == ANY) return true;
+        if (other == any()) return true;
 
         return switch (type) {
             case Type.Never never -> true;
             case Type.Any any -> false;
-            case Type.Nominal nominal -> extend(nominal, other);
-            case Type.NumberLiteral numberLiteral -> extend(numberLiteral, other);
-            case Type.StringLiteral stringLiteral -> extend(stringLiteral, other);
-            case Type.Integer integer -> extend(integer, other);
-            case Type.String string ->  extend(string, other);
-            case Type.Union union -> extend(union, other);
-            case Type.Intersection intersection -> extend(intersection, other);
-            case Type.Function function -> extend(function, other);
-            case Type.Struct struct -> extend(struct, other);
-            case Type.TypeVariable typeVariable -> extend(typeVariable, other);
+            case Type.Nominal nominal -> extend(nominal, other, visited);
+            case Type.NumberLiteral numberLiteral -> extend(numberLiteral, other, visited);
+            case Type.Integer integer -> extend(integer, other, visited);
+            case Type.Union union -> extend(union, other, visited);
+            case Type.Intersection intersection -> extend(intersection, other, visited);
+            case Type.Function function -> extend(function, other, visited);
+            case Type.Struct struct -> extend(struct, other, visited);
+            case Type.TypeVariable typeVariable -> extend(typeVariable, other, visited);
         };
     }
 
-    private static boolean extend(Type.Nominal type, Type other) {
+    private static boolean extend(Type.Nominal type, Type other, Set<Pair<Type, Type>> visited) {
         if (other instanceof Type.Union(var types)) {
-            return Stream.of(types).anyMatch(t -> extend(type, t));
+            return Stream.of(types).anyMatch(t -> extend(type, t, visited));
         }
         return type == other;
     }
 
-    private static boolean extend(Type.NumberLiteral type, Type other) {
+    private static boolean extend(Type.NumberLiteral type, Type other, Set<Pair<Type, Type>> visited) {
         if (other == INTEGER) return true;
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t, visited));
         return other instanceof Type.NumberLiteral(var value) && type.value().equals(value);
     }
 
-    private static boolean extend(Type.StringLiteral type, Type other) {
-        if (other == STRING) return true;
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
-        return other instanceof Type.StringLiteral(var value) && type.value().equals(value);
-    }
-
-    private static boolean extend(Type.Integer type, Type other) {
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
+    private static boolean extend(Type.Integer type, Type other, Set<Pair<Type, Type>> visited) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t, visited));
         return other == INTEGER;
     }
 
-    private static boolean extend(Type.String type, Type other) {
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
-        return other == STRING;
-    }
-
-    private static boolean extend(Type.Union type, Type other) {
+    private static boolean extend(Type.Union type, Type other, Set<Pair<Type, Type>> visited) {
         for (var t : type.types()) {
-            if (!extend(t, other)) return false;
+            if (!extend(t, other, visited)) return false;
         }
         return true;
     }
 
-    private static boolean extend(Type.Intersection type, Type other) {
+    private static boolean extend(Type.Intersection type, Type other, Set<Pair<Type, Type>> visited) {
         for (var t : type.types()) {
-            if (extend(t, other)) return true;
+            if (extend(t, other, visited)) return true;
         }
         return false;
     }
 
-    private static boolean extend(Type.Function function, Type other) {
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(function, t));
+    private static boolean extend(Type.Function function, Type other, Set<Pair<Type, Type>> visited) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(function, t, visited));
         if (!(other instanceof Type.Function(var returnType, var generics, var parameters))) return false;
-        if (!extend(function.returnType(), returnType)) return false;
+        if (!extend(function.returnType(), returnType, visited)) return false;
         for (var i = 0;  i < parameters.length; i++) {
-            if (!extend(parameters[i], function.parameters()[i])) return false;
+            if (!extend(parameters[i], function.parameters()[i], visited)) return false;
         }
         return true;
     }
 
-    private static boolean extend(Type.Struct type, Type other) {
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t));
+    private static boolean extend(Type.Struct type, Type other, Set<Pair<Type, Type>> visited) {
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(type, t, visited));
         if (!(other instanceof Type.Struct(var fields))) return false;
         for (var entry : fields.entrySet()) {
             if (!type.fields().containsKey(entry.getKey())) return false;
-            if (!extend(type.fields().get(entry.getKey()), entry.getValue())) return false;
+            if (!extend(type.fields().get(entry.getKey()), entry.getValue(), visited)) return false;
         }
         return true;
     }
 
-    public static boolean extend(Type.TypeVariable typeVariable, Type other) {
+    private static boolean extend(Type.TypeVariable typeVariable, Type other, Set<Pair<Type, Type>> visited) {
         if (other instanceof Type.TypeVariable otherTypeVariable) return typeVariable.name().equals(otherTypeVariable.name());
-        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(typeVariable, t));
-        return extend(typeVariable.bounds(), other);
+        if (other instanceof Type.Union(var types)) return Stream.of(types).anyMatch(t -> extend(typeVariable, t, visited));
+        return extend(typeVariable.bounds(), other, visited);
     }
 
     // operations

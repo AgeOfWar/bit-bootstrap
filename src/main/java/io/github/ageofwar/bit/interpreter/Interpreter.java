@@ -12,8 +12,6 @@ import java.util.stream.Stream;
 import static io.github.ageofwar.bit.types.Types.*;
 
 public class Interpreter {
-    private Object eos;
-
     @SuppressWarnings("unchecked")
     public void interpret(ResolvedBit.Program program, String mainFunctionName) {
         var environment = Environment.init(program.variables());
@@ -86,9 +84,6 @@ public class Interpreter {
     private void interpret(ResolvedBit.Declaration.Type type, Environment environment) {
         if (type.valueName() != null) {
             environment.assignVariable(type.valueName(), type.value());
-            if (type.value() instanceof Type.Nominal(var name) && name.equals("EndOfSequence")) {
-                eos = type.value();
-            }
         }
     }
 
@@ -223,7 +218,25 @@ public class Interpreter {
     }
 
     private Object eval(ResolvedBit.Expression.StringLiteral stringLiteral) {
-        return stringLiteral.value();
+        return new Struct(Map.of(
+                "$", stringLiteral.value(),
+                "sequence", (Function<List<Object>, Object>) args -> {
+                    var str = stringLiteral.value();
+                    var iterator = str.chars().mapToObj(c -> eval(new ResolvedBit.Expression.StringLiteral(String.valueOf((char) c), string(), never()))).iterator();
+                    return new Struct(Map.of(
+                            "next", (Function<List<Object>, Object>) a -> iterator.hasNext() ? iterator.next() : none()
+                    ));
+                },
+                "size", (Function<List<Object>, Object>) args -> BigInteger.valueOf(stringLiteral.value().length()),
+                "get", (Function<List<Object>, Object>) args -> {
+                    var index = (BigInteger) args.getFirst();
+                    var str = stringLiteral.value();
+                    if (index.compareTo(BigInteger.ZERO) < 0 || index.compareTo(BigInteger.valueOf(str.length())) >= 0) {
+                        return none();
+                    }
+                    return eval(new ResolvedBit.Expression.StringLiteral(String.valueOf(str.charAt(index.intValue())), string(), never()));
+                }
+        ));
     }
 
     private Object eval(ResolvedBit.Expression.BooleanLiteral booleanLiteral) {
@@ -345,7 +358,7 @@ public class Interpreter {
                     var iterator = Arrays.stream(value).iterator();
                     return new Struct(Map.of(
                             "next", (Function<List<Object>, Object>) a -> {
-                                return iterator.hasNext() ? iterator.next() : eos;
+                                return iterator.hasNext() ? iterator.next() : none();
                             }
                     ));
                 }
@@ -430,7 +443,7 @@ public class Interpreter {
 
     // is assignable
 
-    public static boolean isAssignable(Object value, Type type, Environment environment) {
+    public boolean isAssignable(Object value, Type type, Environment environment) {
         if (type == any()) return true;
         if (type == never()) return false;
 
@@ -442,8 +455,8 @@ public class Interpreter {
             return extend(integer(bigInteger), type);
         }
 
-        if (value instanceof String string) {
-            return extend(string(string), type);
+        if (value instanceof String) {
+            return extend(string(), type);
         }
 
         if (value instanceof Boolean bool) {

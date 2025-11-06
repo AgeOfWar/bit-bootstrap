@@ -1,8 +1,8 @@
-from io import *
-from format import *
+from format import println
 from collection import *
 
+
 fun main() {
-    array = [1, 2, 3]
+    array = "abc"
     array.forEach(println)
 }

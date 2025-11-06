@@ -286,7 +286,9 @@ public class Resolver {
                 var valueSymbol = environment.declareValueType(declaration.name(), type);
                 return new ResolvedBit.Declaration.Type(symbol, valueSymbol, List.of(), type);
             } else {
-                var resolvedType = resolve(declaration.value(), environment);
+                var innerEnvironment = new ResolverEnvironment(environment);
+                innerEnvironment.declareType(declaration.name(), nominal(declaration.name()));
+                var resolvedType = resolve(declaration.value(), innerEnvironment);
                 var symbol = environment.declareType(declaration.name(), resolvedType);
                 return new ResolvedBit.Declaration.Type(symbol, null, List.of(), resolvedType);
             }
@@ -296,6 +298,7 @@ public class Resolver {
                 var symbol = environment.declareFunctionType(declaration.name(), typeFunction);
                 return new ResolvedBit.Declaration.Type(symbol, null, typeParameters, nominal(declaration.name()));
             } else {
+                // TODO recursive type functions
                 var typeFunction = new TypeFunction((args) -> {
                     var newEnvironment = new ResolverEnvironment(environment);
                     for (int i = 0; i < typeParameters.size(); i++) {
@@ -449,7 +452,7 @@ public class Resolver {
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.StringLiteral stringLiteral, ResolverEnvironment environment) {
-        return new ResolvedBit.Expression.StringLiteral(stringLiteral.value(), string(stringLiteral.value()), never());
+        return new ResolvedBit.Expression.StringLiteral(stringLiteral.value(), string(), never());
     }
 
     private ResolvedBit.Expression resolve(Bit.Expression.BooleanLiteral booleanLiteral, ResolverEnvironment environment) {
@@ -773,7 +776,7 @@ public class Resolver {
             case Bit.TypeExpression.Union union -> resolve(union, environment);
             case Bit.TypeExpression.Intersection intersection -> resolve(intersection, environment);
             case Bit.TypeExpression.NumberLiteral numberLiteral -> integer(numberLiteral.value());
-            case Bit.TypeExpression.StringLiteral stringLiteral -> string(stringLiteral.value());
+            case Bit.TypeExpression.StringLiteral stringLiteral -> string();
             case Bit.TypeExpression.BooleanLiteral booleanLiteral -> booleanLiteral.value() ? _true() : _false();
             case Bit.TypeExpression.Struct struct -> resolve(struct, environment);
             case Bit.TypeExpression.Minus minus ->

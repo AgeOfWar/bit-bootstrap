@@ -27,6 +27,10 @@ public class Environment {
             }
         });
         environment.assignVariable(new ResolvedBit.Symbol("__write_stdout", i++), (Function<List<Object>, Object>) args -> {
+            if (args.getFirst() instanceof Struct(var fields) && fields.containsKey("$")) {
+                System.out.print(fields.get("$"));
+                return none();
+            }
             System.out.print(args.getFirst());
             return none();
         });
